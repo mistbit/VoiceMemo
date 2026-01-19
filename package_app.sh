@@ -18,9 +18,12 @@ rm -rf "$APP_BUNDLE"
 mkdir -p "$MACOS_DIR"
 mkdir -p "$RESOURCES_DIR"
 
-echo "Step 3: Copying binary and Info.plist..."
+echo "Step 3: Copying binary, Info.plist and AppIcon..."
 cp ".build/release/$APP_NAME" "$MACOS_DIR/"
 cp "Info.plist" "$CONTENTS_DIR/"
+if [ -f "AppIcon.icns" ]; then
+    cp "AppIcon.icns" "$RESOURCES_DIR/"
+fi
 
 echo "Step 4: Signing the application (ad-hoc)..."
 # 使用 ad-hoc 签名，以便在本地运行并请求权限
