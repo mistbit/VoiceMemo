@@ -14,12 +14,14 @@ class OSSService {
             throw NSError(domain: "OSSService", code: 401, userInfo: [NSLocalizedDescriptionKey: "Missing AccessKey"])
         }
         
-        settings.log("OSS upload start: file=\(fileURL.path) bucket=\(settings.ossBucket) key=\(objectKey) region=\(settings.ossRegion) endpoint=\(settings.ossEndpoint)")
+        let endpoint = settings.ossEndpoint.hasPrefix("http") ? settings.ossEndpoint : "https://\(settings.ossEndpoint)"
+        
+        settings.log("OSS upload start: file=\(fileURL.path) bucket=\(settings.ossBucket) key=\(objectKey) region=\(settings.ossRegion) endpoint=\(endpoint)")
         
         let provider = StaticCredentialsProvider(accessKeyId: akId, accessKeySecret: akSecret)
         let config = Configuration.default()
             .withRegion(settings.ossRegion)
-            .withEndpoint(settings.ossEndpoint)
+            .withEndpoint(endpoint)
             .withCredentialsProvider(provider)
             
         let client = Client(config)

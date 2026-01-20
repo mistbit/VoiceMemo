@@ -30,6 +30,11 @@ let package = Package(
                 .linkedFramework("AppKit"),
                 .linkedFramework("SwiftUI")
             ]
+        ),
+        .testTarget(
+            name: "WeChatVoiceRecorderTests",
+            dependencies: ["WeChatVoiceRecorder"],
+            path: "Tests/WeChatVoiceRecorderTests"
         )
     ]
 )
