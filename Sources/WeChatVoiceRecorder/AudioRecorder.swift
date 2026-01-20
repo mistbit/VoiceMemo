@@ -67,6 +67,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         }
         
         statusMessage = "Requesting permissions..."
+        settings.log("Start recording: app=\(app.applicationName)")
         
         // Request Mic Permission first
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -108,6 +109,9 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         
         self.remoteURL = folder.appendingPathComponent("recording-\(dateStr)-remote.m4a")
         self.localURL = folder.appendingPathComponent("recording-\(dateStr)-local.m4a")
+        if let recordingId, let remoteURL, let localURL {
+            settings.log("Recording session: id=\(recordingId) remote=\(remoteURL.path) local=\(localURL.path)")
+        }
         
         // Start System Audio Capture (SCK)
         startSystemAudioCapture(app: app)
@@ -142,7 +146,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                 try stream?.addStreamOutput(self, type: .audio, sampleHandlerQueue: remoteQueue)
                 try await stream?.startCapture()
             } catch {
-                print("SCK Start Error: \(error)")
+                settings.log("SCK start error: \(error.localizedDescription)")
             }
         }
     }
@@ -169,7 +173,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                 writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
             }
         } catch {
-            print("Remote Writer Error: \(error)")
+            settings.log("Remote writer error: \(error.localizedDescription)")
         }
     }
     
@@ -184,7 +188,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             guard let micDevice = AVCaptureDevice.default(for: .audio),
                   let micInput = try? AVCaptureDeviceInput(device: micDevice),
                   session.canAddInput(micInput) else {
-                print("Cannot add mic input")
+                self.settings.log("Cannot add mic input")
                 return
             }
             session.addInput(micInput)
@@ -221,7 +225,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                 writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
             }
         } catch {
-            print("Mic Writer Error: \(error)")
+            settings.log("Mic writer error: \(error.localizedDescription)")
         }
     }
     
@@ -229,6 +233,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     
     func stopRecording() {
         Task {
+            settings.log("Stop recording")
             // 1. Stop System Audio
             try? await stream?.stopCapture()
             stream = nil
@@ -247,6 +252,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             
             // 3. Merge
             if let rURL = remoteURL, let lURL = localURL, let recId = recordingId {
+                settings.log("Merge start: remote=\(rURL.path) local=\(lURL.path)")
                 await MainActor.run { self.statusMessage = "Merging audio files..." }
                 let mixedURL = rURL.deletingLastPathComponent().appendingPathComponent(rURL.lastPathComponent.replacingOccurrences(of: "remote", with: "mixed"))
                 do {
@@ -261,11 +267,13 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                         DatabaseManager.shared.saveTask(task)
                         self.latestTask = task
                     }
+                    settings.log("Merge success: mixed=\(mixedURL.path)")
                 } catch {
                     await MainActor.run {
                         self.isRecording = false
                         self.statusMessage = "Merge failed: \(error.localizedDescription)"
                     }
+                    settings.log("Merge failed: \(error.localizedDescription)")
                 }
             }
             
@@ -317,7 +325,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     }
     
     func stream(_ stream: SCStream, didStopWithError error: Error) {
-        print("SCStream error: \(error)")
+        settings.log("SCStream error: \(error.localizedDescription)")
     }
     
     // AVCaptureAudioDataOutputSampleBufferDelegate

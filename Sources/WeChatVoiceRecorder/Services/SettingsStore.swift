@@ -37,10 +37,15 @@ class SettingsStore: ObservableObject {
     @Published var enableRoleSplit: Bool {
         didSet { UserDefaults.standard.set(enableRoleSplit, forKey: "enableRoleSplit") }
     }
+    @Published var enableVerboseLogging: Bool {
+        didSet { UserDefaults.standard.set(enableVerboseLogging, forKey: "enableVerboseLogging") }
+    }
     
     // Secrets (In-memory placeholders, real values in Keychain)
     @Published var hasAccessKeyId: Bool = false
     @Published var hasAccessKeySecret: Bool = false
+    
+    private let logQueue = DispatchQueue(label: "com.wechatvoicerecorder.log")
     
     init() {
         self.ossRegion = UserDefaults.standard.string(forKey: "ossRegion") ?? "oss-cn-beijing"
@@ -55,6 +60,7 @@ class SettingsStore: ObservableObject {
         self.enableKeyPoints = UserDefaults.standard.object(forKey: "enableKeyPoints") as? Bool ?? true
         self.enableActionItems = UserDefaults.standard.object(forKey: "enableActionItems") as? Bool ?? true
         self.enableRoleSplit = UserDefaults.standard.object(forKey: "enableRoleSplit") as? Bool ?? true
+        self.enableVerboseLogging = UserDefaults.standard.object(forKey: "enableVerboseLogging") as? Bool ?? false
         
         checkSecrets()
     }
@@ -86,5 +92,43 @@ class SettingsStore: ObservableObject {
         KeychainHelper.shared.delete(account: "aliyun_ak_id")
         KeychainHelper.shared.delete(account: "aliyun_ak_secret")
         checkSecrets()
+    }
+    
+    func log(_ message: String) {
+        guard enableVerboseLogging else { return }
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let line = "[\(timestamp)] \(message)"
+        print("[WVR] \(line)")
+        logQueue.async {
+            let url = self.logFileURL()
+            let dir = url.deletingLastPathComponent()
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            if let data = (line + "\n").data(using: .utf8) {
+                if FileManager.default.fileExists(atPath: url.path) {
+                    if let handle = try? FileHandle(forWritingTo: url) {
+                        _ = try? handle.seekToEnd()
+                        try? handle.write(contentsOf: data)
+                        try? handle.close()
+                    }
+                } else {
+                    try? data.write(to: url)
+                }
+            }
+        }
+    }
+    
+    func readLogText() -> String {
+        let url = logFileURL()
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    }
+    
+    func clearLogFile() {
+        let url = logFileURL()
+        try? FileManager.default.removeItem(at: url)
+    }
+    
+    func logFileURL() -> URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return base.appendingPathComponent("WeChatVoiceRecorder/Logs/app.log")
     }
 }
