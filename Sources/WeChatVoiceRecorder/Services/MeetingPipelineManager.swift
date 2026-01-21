@@ -77,7 +77,33 @@ class MeetingPipelineManager: ObservableObject {
     
     private func performTranscode(input: URL, output: URL) async -> Bool {
         try? FileManager.default.removeItem(at: output)
+        
+        // Basic check if input file exists and has content
+        do {
+            let attrs = try FileManager.default.attributesOfItem(atPath: input.path)
+            if let size = attrs[.size] as? UInt64, size == 0 {
+                settings.log("Transcode failed: Input file \(input.lastPathComponent) is empty (0 bytes)")
+                return false
+            }
+        } catch {
+            settings.log("Transcode failed: Cannot access input file \(input.lastPathComponent): \(error.localizedDescription)")
+            return false
+        }
+
         let asset = AVAsset(url: input)
+        
+        // Check if asset is readable
+        do {
+            let isReadable = try await asset.load(.isReadable)
+            if !isReadable {
+                settings.log("Transcode failed: Input file \(input.lastPathComponent) is not readable by AVAsset")
+                return false
+            }
+        } catch {
+            settings.log("Transcode failed: Failed to load asset metadata for \(input.lastPathComponent): \(error.localizedDescription)")
+            return false
+        }
+
         guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
             settings.log("Transcode failed: cannot create export session for \(input.lastPathComponent)")
             return false
@@ -90,7 +116,8 @@ class MeetingPipelineManager: ObservableObject {
         if exportSession.status == .completed {
             return true
         } else {
-            settings.log("Transcode failed: \(exportSession.error?.localizedDescription ?? "Unknown")")
+            let err = exportSession.error?.localizedDescription ?? "Unknown error"
+            settings.log("Transcode failed for \(input.lastPathComponent): \(err)")
             return false
         }
     }
