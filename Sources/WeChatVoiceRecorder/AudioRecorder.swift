@@ -189,7 +189,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                 AVSampleRateKey: targetSampleRate,
                 AVNumberOfChannelsKey: channels,
                 AVEncoderBitRateKey: 128000,
-                AVSampleRateConverterAudioQualityKey: AVAudioQuality.high.rawValue
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
             ]
             
             remoteAssetWriterInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings, sourceFormatHint: formatDesc)
@@ -273,7 +273,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                 AVSampleRateKey: targetSampleRate,
                 AVNumberOfChannelsKey: channels,
                 AVEncoderBitRateKey: 128000,
-                AVSampleRateConverterAudioQualityKey: AVAudioQuality.high.rawValue
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
             ]
             
             micAssetWriterInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings, sourceFormatHint: formatDesc)

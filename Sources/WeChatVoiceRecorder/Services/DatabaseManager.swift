@@ -130,30 +130,47 @@ class DatabaseManager {
                 t.column(speaker2Status)
             })
             
-            // Migration for existing tables
-            _ = try? db.run(tasks.addColumn(taskKey))
-            _ = try? db.run(tasks.addColumn(apiStatus))
-            _ = try? db.run(tasks.addColumn(statusText))
-            _ = try? db.run(tasks.addColumn(bizDuration))
-            _ = try? db.run(tasks.addColumn(outputMp3Path))
-            _ = try? db.run(tasks.addColumn(lastSuccessfulStatus))
-            _ = try? db.run(tasks.addColumn(failedStep))
-            _ = try? db.run(tasks.addColumn(retryCount, defaultValue: 0))
+            // Migration for existing tables - only add if they don't exist
+            let existingColumns = getColumnNames()
+            
+            if !existingColumns.contains("task_key") { _ = try? db.run(tasks.addColumn(taskKey)) }
+            if !existingColumns.contains("api_status") { _ = try? db.run(tasks.addColumn(apiStatus)) }
+            if !existingColumns.contains("status_text") { _ = try? db.run(tasks.addColumn(statusText)) }
+            if !existingColumns.contains("biz_duration") { _ = try? db.run(tasks.addColumn(bizDuration)) }
+            if !existingColumns.contains("output_mp3_path") { _ = try? db.run(tasks.addColumn(outputMp3Path)) }
+            if !existingColumns.contains("last_successful_status") { _ = try? db.run(tasks.addColumn(lastSuccessfulStatus)) }
+            if !existingColumns.contains("failed_step") { _ = try? db.run(tasks.addColumn(failedStep)) }
+            if !existingColumns.contains("retry_count") { _ = try? db.run(tasks.addColumn(retryCount, defaultValue: 0)) }
             
             // Migration for Separated Mode
-            _ = try? db.run(tasks.addColumn(mode, defaultValue: "mixed"))
-            _ = try? db.run(tasks.addColumn(speaker1AudioPath))
-            _ = try? db.run(tasks.addColumn(speaker2AudioPath))
-            _ = try? db.run(tasks.addColumn(speaker2OssUrl))
-            _ = try? db.run(tasks.addColumn(speaker2TingwuTaskId))
-            _ = try? db.run(tasks.addColumn(speaker1Transcript))
-            _ = try? db.run(tasks.addColumn(speaker2Transcript))
-            _ = try? db.run(tasks.addColumn(alignedConversation))
-            _ = try? db.run(tasks.addColumn(speaker1Status))
-            _ = try? db.run(tasks.addColumn(speaker2Status))
+            if !existingColumns.contains("mode") { _ = try? db.run(tasks.addColumn(mode, defaultValue: "mixed")) }
+            if !existingColumns.contains("speaker1_audio_path") { _ = try? db.run(tasks.addColumn(speaker1AudioPath)) }
+            if !existingColumns.contains("speaker2_audio_path") { _ = try? db.run(tasks.addColumn(speaker2AudioPath)) }
+            if !existingColumns.contains("speaker2_oss_url") { _ = try? db.run(tasks.addColumn(speaker2OssUrl)) }
+            if !existingColumns.contains("speaker2_tingwu_task_id") { _ = try? db.run(tasks.addColumn(speaker2TingwuTaskId)) }
+            if !existingColumns.contains("speaker1_transcript") { _ = try? db.run(tasks.addColumn(speaker1Transcript)) }
+            if !existingColumns.contains("speaker2_transcript") { _ = try? db.run(tasks.addColumn(speaker2Transcript)) }
+            if !existingColumns.contains("aligned_conversation") { _ = try? db.run(tasks.addColumn(alignedConversation)) }
+            if !existingColumns.contains("speaker1_status") { _ = try? db.run(tasks.addColumn(speaker1Status)) }
+            if !existingColumns.contains("speaker2_status") { _ = try? db.run(tasks.addColumn(speaker2Status)) }
         } catch {
             print("Create table error: \(error)")
         }
+    }
+    
+    private func getColumnNames() -> Set<String> {
+        guard let db = db else { return [] }
+        var names = Set<String>()
+        do {
+            for row in try db.prepare("PRAGMA table_info(meeting_tasks)") {
+                if let name = row[1] as? String {
+                    names.insert(name)
+                }
+            }
+        } catch {
+            print("Get column names error: \(error)")
+        }
+        return names
     }
     
     // CRUD Operations
