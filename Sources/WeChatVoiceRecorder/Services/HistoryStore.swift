@@ -19,4 +19,21 @@ class HistoryStore: ObservableObject {
         }
         refresh()
     }
+
+    func deleteTask(_ task: MeetingTask) {
+        DatabaseManager.shared.deleteTask(id: task.id)
+        refresh()
+    }
+
+    func deleteTasks(_ tasks: [MeetingTask]) {
+        for task in tasks {
+            DatabaseManager.shared.deleteTask(id: task.id)
+        }
+        refresh()
+    }
+
+    func updateTitle(for task: MeetingTask, newTitle: String) {
+        DatabaseManager.shared.updateTaskTitle(id: task.id, newTitle: newTitle)
+        refresh()
+    }
 }

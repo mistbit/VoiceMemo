@@ -293,4 +293,10 @@ class DatabaseManager {
         let task = tasks.filter(self.id == id.uuidString)
         _ = try? db.run(task.delete())
     }
+
+    func updateTaskTitle(id: UUID, newTitle: String) {
+        guard let db = db else { return }
+        let task = tasks.filter(self.id == id.uuidString)
+        _ = try? db.run(task.update(title <- newTitle))
+    }
 }
