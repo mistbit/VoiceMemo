@@ -12,6 +12,7 @@ Read this in Chinese: [README_CN.md](README_CN.md)
 - **Native Performance**: Built with SwiftUI and ScreenCaptureKit for optimal performance and low CPU overhead.
 - **Privacy-First**: Operates locally on your machine with clear permission handling.
 - **Meeting Minutes (Alibaba Cloud Tingwu + OSS)**: Manual pipeline to transcribe audio and generate structured minutes (summary, key points, action items), with Markdown export.
+- **Storage Backends (SQLite/MySQL)**: Store history locally or in MySQL, with optional local-to-MySQL sync.
 
 ## Changelog
 
@@ -40,10 +41,13 @@ flowchart LR
     B --> C
     C --> D["MeetingPipelineManager<br/>State machine"]
     D -->|Transcode| E["AVAssetExportSession<br/>mixed_48k.m4a"]
-    D -->|Persist| J["DatabaseManager<br/>SQLite"]
+    D -->|Persist| SM["StorageManager<br/>StorageProvider"]
     D -->|Config| S["SettingsStore"]
     S --> K["KeychainHelper<br/>AK/SK"]
-    J --> V["SwiftUI Views<br/>SettingsView / PipelineView / ResultView"]
+    SM -->|Local| J1["SQLiteStorage<br/>SQLite"]
+    SM -->|Remote| J2["MySQLStorage<br/>mysql-kit"]
+    J1 --> V["SwiftUI Views<br/>SettingsView / PipelineView / ResultView"]
+    J2 --> V
   end
 
   subgraph Cloud["Alibaba Cloud"]
@@ -109,7 +113,8 @@ After a recording completes, the latest task appears in the pipeline UI. Trigger
 To open the project in Xcode for debugging:
 
 ```bash
-xed .
+python3 generate_project.py
+xed VoiceMemo.xcodeproj
 ```
 
 Ensure you configure **Signing & Capabilities** with your Development Team to run the app with full permissions.

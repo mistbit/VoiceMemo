@@ -51,7 +51,8 @@ For stable behavior during development:
 
 - Keep Bundle ID stable.
 - Use a stable development Team and automatic signing in Xcode.
-- Avoid re-generating the Xcode project if it resets `DEVELOPMENT_TEAM`.
+- If you use the generated `VoiceMemo.xcodeproj`, re-run `generate_project.py` after dependency changes to keep package references in sync.
+  - If Xcode shows `No such module` for a SwiftPM dependency, try `File > Packages > Reset Package Caches` and then clean the build folder.
 
 Packaging script note:
 
@@ -62,4 +63,3 @@ Packaging script note:
 
 - Debug via Xcode with automatic signing and a fixed team.
 - Use the packaging script only for quick local distribution/testing; expect permission prompts unless you switch to a stable signing identity.
-

@@ -21,9 +21,11 @@
     - `KeychainHelper.swift`：Keychain 密钥存储（RAM AK/Secret）。
     - `OSSService.swift`：上传音频到 OSS。
     - `TingwuService.swift`：创建听悟离线任务 + 查询任务信息。
-    - `MeetingPipelineManager.swift`：混合模式流水线（串联转码/上传/创建/轮询并写入数据库）。
-    - `SeparatedMeetingPipelineManager.swift`：分离模式流水线（独立处理双路音频并对齐）。
-    - `DatabaseManager.swift`：SQLite 任务持久化。
+    - `MeetingPipelineManager.swift`：流水线管理器（串联转码/上传/创建/轮询并写入存储）。
+    - `Storage/StorageProvider.swift`：存储抽象接口。
+    - `Storage/SQLiteStorage.swift`：本地 SQLite 任务持久化。
+    - `Storage/MySQLStorage.swift`：MySQL 任务持久化。
+    - `Storage/StorageManager.swift`：按配置切换存储实现，并支持同步。
     - `HistoryStore.swift`：历史列表的 Observable 包装。
   - `Views/`：SwiftUI 界面（录音、流水线、结果、设置、历史）。
 
@@ -37,7 +39,7 @@
 - 领域模型
   - `MeetingTask` 表示一次录音及其云端处理生命周期。
 - 存储
-  - `DatabaseManager` 通过 SQLite 保存任务，跨启动保留历史。
+  - 存储通过 `StorageProvider` 抽象，并由 `StorageManager` 选择具体实现（默认 SQLite，可选 MySQL）。
 - 云端
   - OSS 用于文件托管，听悟用于转写与总结。
 
@@ -86,6 +88,6 @@ flowchart TD
 
 - `ScreenCaptureKit` + `AVFoundation`：音频采集与导出。
 - `SQLite.swift`：本地持久化。
+- `mysql-kit`：可选的 MySQL 持久化。
 - `alibabacloud-oss-swift-sdk-v2`：OSS 上传。
 - `CryptoKit`：听悟请求签名（ACS3-HMAC-SHA256）。
-
