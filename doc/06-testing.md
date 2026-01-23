@@ -8,13 +8,13 @@ Explain the current test suite and how to run it safely without committing secre
 
 SwiftPM test target:
 
-- `WeChatVoiceRecorderTests`
+- `VoiceMemoTests`
 
 Test files:
 
-- `Tests/WeChatVoiceRecorderTests/TingwuSignatureTests.swift`
-- `Tests/WeChatVoiceRecorderTests/TingwuCreateTaskTests.swift`
-- `Tests/WeChatVoiceRecorderTests/OSSUploadTests.swift`
+- `Tests/VoiceMemoTests/TingwuSignatureTests.swift`
+- `Tests/VoiceMemoTests/TingwuCreateTaskTests.swift`
+- `Tests/VoiceMemoTests/OSSUploadTests.swift`
 
 ## What Is Covered
 

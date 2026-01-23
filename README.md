@@ -1,4 +1,4 @@
-# WeChatVoiceRecorder
+# VoiceMemo
 
 A professional, high-fidelity audio recording utility for macOS, specifically designed to capture real-time WeChat voice conversations using the native **ScreenCaptureKit** and **AVFoundation** frameworks.
 
@@ -72,7 +72,7 @@ Due to macOS security requirements (ScreenCaptureKit needs specific entitlements
 ```bash
 chmod +x package_app.sh
 ./package_app.sh
-open WeChatVoiceRecorder.app
+open VoiceMemo.app
 ```
 
 ### 2. Permissions

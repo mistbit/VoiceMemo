@@ -1,12 +1,12 @@
 import os
 import hashlib
 
-PROJECT_NAME = "WeChatVoiceRecorder"
-BUNDLE_ID = "com.wechat.voicerecorder"
-SOURCES_DIR = "Sources/WeChatVoiceRecorder"
-ENTITLEMENTS_PATH = "WeChatVoiceRecorder.entitlements"
-INFO_PLIST_PATH = "Sources/WeChatVoiceRecorder/Info.plist"
-RESOURCES_DIR = "Sources/WeChatVoiceRecorder/Resources"
+PROJECT_NAME = "VoiceMemo"
+BUNDLE_ID = "cn.mistbit.voicememo"
+SOURCES_DIR = "Sources/VoiceMemo"
+ENTITLEMENTS_PATH = "VoiceMemo.entitlements"
+INFO_PLIST_PATH = "Sources/VoiceMemo/Info.plist"
+RESOURCES_DIR = "Sources/VoiceMemo/Resources"
 
 DEPENDENCIES = [
     ("https://github.com/aliyun/alibabacloud-oss-swift-sdk-v2.git", "0.1.0-beta", "AlibabaCloudOSS"),

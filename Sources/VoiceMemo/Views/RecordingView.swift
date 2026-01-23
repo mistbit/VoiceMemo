@@ -6,7 +6,6 @@ struct RecordingView: View {
     @ObservedObject var settings: SettingsStore
     
     var body: some View {
-        let controlWidth: CGFloat = 400
         ScrollView {
             VStack(spacing: 40) {
                 // Header & Status

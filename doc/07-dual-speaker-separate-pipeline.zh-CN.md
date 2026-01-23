@@ -61,11 +61,11 @@ flowchart TD
 
 ### 现有相关入口
 
-- 录音与混合输出：`Sources/WeChatVoiceRecorder/AudioRecorder.swift`
-- 混合流水线：`Sources/WeChatVoiceRecorder/Services/MeetingPipelineManager.swift`
-- 任务模型：`Sources/WeChatVoiceRecorder/Models/MeetingTask.swift`
-- 设置与特性开关：`Sources/WeChatVoiceRecorder/Services/SettingsStore.swift`
-- 结果展示与导出：`Sources/WeChatVoiceRecorder/Views/ResultView.swift`
+- 录音与混合输出：`Sources/VoiceMemo/AudioRecorder.swift`
+- 混合流水线：`Sources/VoiceMemo/Services/MeetingPipelineManager.swift`
+- 任务模型：`Sources/VoiceMemo/Models/MeetingTask.swift`
+- 设置与特性开关：`Sources/VoiceMemo/Services/SettingsStore.swift`
+- 结果展示与导出：`Sources/VoiceMemo/Views/ResultView.swift`
 
 ### 新增/扩展建议（不复用流水线）
 

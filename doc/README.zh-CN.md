@@ -1,4 +1,4 @@
-# WeChatVoiceRecorder 文档
+# VoiceMemo 文档
 
 - 从这里开始：01-architecture-overview.zh-CN.md
 - English entry: README.md

@@ -63,14 +63,14 @@ class DatabaseManager {
                 baseDir = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
             }
             
-            let appDir = baseDir.appendingPathComponent("WeChatVoiceRecorder")
+            let appDir = baseDir.appendingPathComponent("VoiceMemo")
             
             do {
                 try fileManager.createDirectory(at: appDir, withIntermediateDirectories: true)
             } catch {
                 print("Failed to create database directory: \(error)")
                 // Try using a temporary directory as last resort
-                let tempDir = fileManager.temporaryDirectory.appendingPathComponent("WeChatVoiceRecorder")
+                let tempDir = fileManager.temporaryDirectory.appendingPathComponent("VoiceMemo")
                 try? fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
                 let dbPath = tempDir.appendingPathComponent("db.sqlite3").path
                 print("Fallback to temp database: \(dbPath)")

@@ -10,9 +10,9 @@
 
 `DatabaseManager` 会按优先级尝试：
 
-- 首选：`~/Library/Application Support/WeChatVoiceRecorder/db.sqlite3`
-- 兜底：`~/Documents/WeChatVoiceRecorder/db.sqlite3`
-- 最后手段：临时目录下 `.../tmp/WeChatVoiceRecorder/db.sqlite3`
+- 首选：`~/Library/Application Support/VoiceMemo/db.sqlite3`
+- 兜底：`~/Documents/VoiceMemo/db.sqlite3`
+- 最后手段：临时目录下 `.../tmp/VoiceMemo/db.sqlite3`
 
 ### 表结构
 
@@ -87,7 +87,7 @@
 
 `KeychainHelper` 使用 service：
 
-- `com.wechatvoicerecorder.secrets`
+- `cn.mistbit.voicememo.secrets`
 
 accounts：
 
@@ -110,11 +110,10 @@ accounts：
 
 日志文件路径：
 
-- `~/Library/Application Support/WeChatVoiceRecorder/Logs/app.log`
+- `~/Library/Application Support/VoiceMemo/Logs/app.log`
 
 设置页提供：
 
 - 展示日志路径
 - 打开日志目录
 - 清空日志
-

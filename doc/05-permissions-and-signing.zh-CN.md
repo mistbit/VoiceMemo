@@ -10,7 +10,7 @@
 
 ScreenCaptureKit 采集系统音频需要屏幕录制权限。
 
-- `Sources/WeChatVoiceRecorder/Info.plist` 中的说明文案：
+- `Sources/VoiceMemo/Info.plist` 中的说明文案：
   - `NSScreenCaptureUsageDescription`
 - 授权路径：
   - 系统设置 → 隐私与安全性 → 屏幕录制
@@ -19,12 +19,12 @@ ScreenCaptureKit 采集系统音频需要屏幕录制权限。
 
 采集本地麦克风需要麦克风权限。
 
-- `Sources/WeChatVoiceRecorder/Info.plist`：
+- `Sources/VoiceMemo/Info.plist`：
   - `NSMicrophoneUsageDescription`
 
 ## Entitlements
 
-文件：`WeChatVoiceRecorder.entitlements`
+文件：`VoiceMemo.entitlements`
 
 当前包含：
 
@@ -38,8 +38,8 @@ ScreenCaptureKit 采集系统音频需要屏幕录制权限。
 
 应用身份的核心是 Bundle ID：
 
-- `Info.plist` 的 `CFBundleIdentifier`：`com.wechat.voicerecorder`
-- Xcode target 的 `PRODUCT_BUNDLE_IDENTIFIER`：`com.wechat.voicerecorder`
+- `Info.plist` 的 `CFBundleIdentifier`：`cn.mistbit.voicememo`
+- Xcode target 的 `PRODUCT_BUNDLE_IDENTIFIER`：`cn.mistbit.voicememo`
 
 Bundle ID 变化会被 macOS 视为新应用身份，从而重新弹窗授权。
 

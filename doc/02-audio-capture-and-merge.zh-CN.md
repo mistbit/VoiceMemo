@@ -6,9 +6,9 @@
 
 ## 关键文件
 
-- `Sources/WeChatVoiceRecorder/AudioRecorder.swift`
-- `Sources/WeChatVoiceRecorder/Models/MeetingTask.swift` (包含 `MeetingMode` 定义)
-- `Sources/WeChatVoiceRecorder/Info.plist`（权限说明文案）
+- `Sources/VoiceMemo/AudioRecorder.swift`
+- `Sources/VoiceMemo/Models/MeetingTask.swift` (包含 `MeetingMode` 定义)
+- `Sources/VoiceMemo/Info.plist`（权限说明文案）
 
 ## 录制模式
 
@@ -28,7 +28,7 @@
 
 `AudioRecorder.beginRecordingSession` 会创建：
 
-- 目录：`~/Downloads/WeChatRecordings/`
+- 目录：`~/Downloads/VoiceMemoRecordings/`
 - 文件名：
   - `recording-<timestamp>-remote.m4a`
   - `recording-<timestamp>-local.m4a`
@@ -96,4 +96,3 @@ ScreenCaptureKit 采集系统音频需要：
 - 麦克风权限拒绝：本地轨为空；具体表现取决于运行时状态。
 - 写入器初始化失败：音频格式描述异常（采样率/声道为 0）。
 - 导出失败：合成导出报错，无法生成 mixed 文件。
-

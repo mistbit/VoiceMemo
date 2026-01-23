@@ -6,10 +6,10 @@
 
 ## 关键文件
 
-- `Sources/WeChatVoiceRecorder/Views/PipelineView.swift`
-- `Sources/WeChatVoiceRecorder/Services/MeetingPipelineManager.swift`
-- `Sources/WeChatVoiceRecorder/Services/OSSService.swift`
-- `Sources/WeChatVoiceRecorder/Services/TingwuService.swift`
+- `Sources/VoiceMemo/Views/PipelineView.swift`
+- `Sources/VoiceMemo/Services/MeetingPipelineManager.swift`
+- `Sources/VoiceMemo/Services/OSSService.swift`
+- `Sources/VoiceMemo/Services/TingwuService.swift`
 
 ## 流水线管理器
 
@@ -102,5 +102,5 @@
 - 写入 `Authorization`：
   - `ACS3-HMAC-SHA256 Credential=<akId>,SignedHeaders=<...>,Signature=<...>`
 
-Canonical Request 的构造在 `Tests/WeChatVoiceRecorderTests/TingwuSignatureTests.swift` 中有测试用例。
+Canonical Request 的构造在 `Tests/VoiceMemoTests/TingwuSignatureTests.swift` 中有测试用例。
 

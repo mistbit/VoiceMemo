@@ -5,11 +5,13 @@
     <key>CFBundleIconFile</key>
     <string>AppIcon.icns</string>
     <key>CFBundleExecutable</key>
-    <string>WeChatVoiceRecorder</string>
+    <string>VoiceMemo</string>
     <key>CFBundleIdentifier</key>
-    <string>com.wechat.voicerecorder</string>
+    <string>cn.mistbit.voicememo</string>
     <key>CFBundleName</key>
-    <string>WeChatVoiceRecorder</string>
+    <string>VoiceMemo</string>
+    <key>CFBundleDisplayName</key>
+    <string>VoiceMemo</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

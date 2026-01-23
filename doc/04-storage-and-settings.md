@@ -10,9 +10,9 @@ Explain where data is stored, how settings and secrets are handled, and how logs
 
 `DatabaseManager` attempts to place the DB at:
 
-- Preferred: `~/Library/Application Support/WeChatVoiceRecorder/db.sqlite3`
-- Fallback: `~/Documents/WeChatVoiceRecorder/db.sqlite3`
-- Last resort: `~/Library/Caches/.../tmp/WeChatVoiceRecorder/db.sqlite3` (temporary directory)
+- Preferred: `~/Library/Application Support/VoiceMemo/db.sqlite3`
+- Fallback: `~/Documents/VoiceMemo/db.sqlite3`
+- Last resort: `~/Library/Caches/.../tmp/VoiceMemo/db.sqlite3` (temporary directory)
 
 ### Schema
 
@@ -87,7 +87,7 @@ Writes use `insert(or: .replace)` keyed by `id`.
 
 `KeychainHelper` stores secrets under service:
 
-- `com.wechatvoicerecorder.secrets`
+- `cn.mistbit.voicememo.secrets`
 
 Accounts used:
 
@@ -110,11 +110,10 @@ Accounts used:
 
 Log file:
 
-- `~/Library/Application Support/WeChatVoiceRecorder/Logs/app.log`
+- `~/Library/Application Support/VoiceMemo/Logs/app.log`
 
 Settings UI provides:
 
 - show current log path
 - open log folder
 - clear log
-

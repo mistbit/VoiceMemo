@@ -1,4 +1,4 @@
-# WeChatVoiceRecorder (微信语音录制器)
+# VoiceMemo
 
 一款专业、高保真的 macOS 音频录制工具，专为捕获微信实时语音通话设计。基于 macOS 原生的 **ScreenCaptureKit** 和 **AVFoundation** 框架构建。
 
@@ -72,7 +72,7 @@ flowchart LR
 ```bash
 chmod +x package_app.sh
 ./package_app.sh
-open WeChatVoiceRecorder.app
+open VoiceMemo.app
 ```
 
 ### 2. 权限说明

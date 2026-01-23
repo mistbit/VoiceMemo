@@ -30,7 +30,7 @@ Use this structure unless the document is a short note:
 
 ## Code References
 
-- Use relative paths in docs (e.g. `Sources/WeChatVoiceRecorder/AudioRecorder.swift`).
+- Use relative paths in docs (e.g. `Sources/VoiceMemo/AudioRecorder.swift`).
 - When referencing key functions/types, include the file path and the identifier name.
 
 ## Secrets & PII

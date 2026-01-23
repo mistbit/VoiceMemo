@@ -1,5 +1,5 @@
 import XCTest
-@testable import WeChatVoiceRecorder
+@testable import VoiceMemo
 
 final class TingwuCreateTaskTests: XCTestCase {
     private let accessKeyId = "YOUR_ACCESS_KEY_ID"

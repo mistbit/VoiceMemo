@@ -11,8 +11,8 @@
 
 ## 目录结构
 
-- `Sources/WeChatVoiceRecorder/`
-  - `WeChatVoiceRecorderApp.swift`：应用入口与 AppDelegate（激活策略）。
+- `Sources/VoiceMemo/`
+  - `VoiceMemoApp.swift`：应用入口与 AppDelegate（激活策略）。
   - `ContentView.swift`：应用骨架、导航与状态装配。
   - `AudioRecorder.swift`：双轨录音与本地合成（支持混合与分离两种模式）。
   - `Models/MeetingTask.swift`：任务模型与状态机。

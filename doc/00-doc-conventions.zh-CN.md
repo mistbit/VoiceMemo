@@ -30,7 +30,7 @@
 
 ## 代码引用
 
-- 文档内使用相对路径（例如 `Sources/WeChatVoiceRecorder/AudioRecorder.swift`）。
+- 文档内使用相对路径（例如 `Sources/VoiceMemo/AudioRecorder.swift`）。
 - 引用关键函数/类型时，写出文件路径与标识符名称，方便快速定位。
 
 ## 密钥与隐私

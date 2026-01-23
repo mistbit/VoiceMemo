@@ -11,8 +11,8 @@ This document explains how the app is structured end-to-end: UI, recording, pipe
 
 ## Key Directories
 
-- `Sources/WeChatVoiceRecorder/`
-  - `WeChatVoiceRecorderApp.swift`: app entry and AppDelegate activation policy.
+- `Sources/VoiceMemo/`
+  - `VoiceMemoApp.swift`: app entry and AppDelegate activation policy.
   - `ContentView.swift`: app shell, navigation, and state wiring.
   - `AudioRecorder.swift`: dual-track audio capture and local merge (supports both mixed and separated modes).
   - `Models/MeetingTask.swift`: persisted task model and status state machine.

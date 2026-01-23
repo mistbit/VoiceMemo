@@ -6,9 +6,9 @@ Describe how the app records “remote/system audio” and “local microphone a
 
 ## Key Files
 
-- `Sources/WeChatVoiceRecorder/AudioRecorder.swift`
-- `Sources/WeChatVoiceRecorder/Models/MeetingTask.swift` (contains `MeetingMode` definition)
-- `Sources/WeChatVoiceRecorder/Info.plist` (usage descriptions)
+- `Sources/VoiceMemo/AudioRecorder.swift`
+- `Sources/VoiceMemo/Models/MeetingTask.swift` (contains `MeetingMode` definition)
+- `Sources/VoiceMemo/Info.plist` (usage descriptions)
 
 ## Recording Modes
 
@@ -28,7 +28,7 @@ Both tracks are encoded as AAC in `.m4a` through `AVAssetWriter`.
 
 `AudioRecorder.beginRecordingSession` creates:
 
-- Folder: `~/Downloads/WeChatRecordings/`
+- Folder: `~/Downloads/VoiceMemoRecordings/`
 - Filenames:
   - `recording-<timestamp>-remote.m4a`
   - `recording-<timestamp>-local.m4a`
@@ -96,4 +96,3 @@ For ScreenCaptureKit audio capture:
 - Mic permission denied: local track missing; recording can still proceed depending on state.
 - Writer setup fails: invalid stream description (sample rate or channels = 0).
 - Export fails: composition export error; merge result not generated.
-

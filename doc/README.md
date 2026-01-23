@@ -1,4 +1,4 @@
-# WeChatVoiceRecorder Docs
+# VoiceMemo Docs
 
 - Start here: 01-architecture-overview.md
 - 中文入口: README.zh-CN.md

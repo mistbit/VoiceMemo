@@ -8,13 +8,13 @@
 
 SwiftPM 测试 Target：
 
-- `WeChatVoiceRecorderTests`
+- `VoiceMemoTests`
 
 测试文件：
 
-- `Tests/WeChatVoiceRecorderTests/TingwuSignatureTests.swift`
-- `Tests/WeChatVoiceRecorderTests/TingwuCreateTaskTests.swift`
-- `Tests/WeChatVoiceRecorderTests/OSSUploadTests.swift`
+- `Tests/VoiceMemoTests/TingwuSignatureTests.swift`
+- `Tests/VoiceMemoTests/TingwuCreateTaskTests.swift`
+- `Tests/VoiceMemoTests/OSSUploadTests.swift`
 
 ## 覆盖内容
 

@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "WeChatVoiceRecorder",
+    name: "VoiceMemo",
     platforms: [
         .macOS(.v13) // ScreenCaptureKit audio capture requires macOS 13.0+
     ],
     products: [
-        .executable(name: "WeChatVoiceRecorder", targets: ["WeChatVoiceRecorder"])
+        .executable(name: "VoiceMemo", targets: ["VoiceMemo"])
     ],
     dependencies: [
         .package(url: "https://github.com/aliyun/alibabacloud-oss-swift-sdk-v2.git", from: "0.1.0-beta"),
@@ -15,12 +15,15 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "WeChatVoiceRecorder",
+            name: "VoiceMemo",
             dependencies: [
                 .product(name: "AlibabaCloudOSS", package: "alibabacloud-oss-swift-sdk-v2"),
                 .product(name: "SQLite", package: "SQLite.swift")
             ],
-            path: "Sources/WeChatVoiceRecorder",
+            path: "Sources/VoiceMemo",
+            exclude: [
+                "Info.plist"
+            ],
             resources: [
                 .copy("Resources/AppIcon.icns")
             ],
@@ -35,9 +38,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "WeChatVoiceRecorderTests",
-            dependencies: ["WeChatVoiceRecorder"],
-            path: "Tests/WeChatVoiceRecorderTests"
+            name: "VoiceMemoTests",
+            dependencies: ["VoiceMemo"],
+            path: "Tests/VoiceMemoTests"
         )
     ]
 )

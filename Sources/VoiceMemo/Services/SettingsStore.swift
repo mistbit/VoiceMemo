@@ -45,7 +45,7 @@ class SettingsStore: ObservableObject {
     @Published var hasAccessKeyId: Bool = false
     @Published var hasAccessKeySecret: Bool = false
     
-    private let logQueue = DispatchQueue(label: "com.wechatvoicerecorder.log")
+    private let logQueue = DispatchQueue(label: "cn.mistbit.voicememo.log")
     
     init() {
         self.ossRegion = UserDefaults.standard.string(forKey: "ossRegion") ?? "cn-beijing"
@@ -131,6 +131,6 @@ class SettingsStore: ObservableObject {
     
     func logFileURL() -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return base.appendingPathComponent("WeChatVoiceRecorder/Logs/app.log")
+        return base.appendingPathComponent("VoiceMemo/Logs/app.log")
     }
 }

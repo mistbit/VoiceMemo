@@ -10,7 +10,7 @@ Explain which permissions are needed, how they map to Info.plist/entitlements, a
 
 Needed for ScreenCaptureKit to capture system audio.
 
-- Usage string in `Sources/WeChatVoiceRecorder/Info.plist`:
+- Usage string in `Sources/VoiceMemo/Info.plist`:
   - `NSScreenCaptureUsageDescription`
 - Grant via:
   - System Settings → Privacy & Security → Screen Recording
@@ -19,12 +19,12 @@ Needed for ScreenCaptureKit to capture system audio.
 
 Needed for local audio track.
 
-- Usage string in `Sources/WeChatVoiceRecorder/Info.plist`:
+- Usage string in `Sources/VoiceMemo/Info.plist`:
   - `NSMicrophoneUsageDescription`
 
 ## Entitlements
 
-File: `WeChatVoiceRecorder.entitlements`
+File: `VoiceMemo.entitlements`
 
 Current keys:
 
@@ -38,8 +38,8 @@ Only add entitlements that are required by actual features; extra entitlements i
 
 The app identity is anchored by Bundle ID:
 
-- `Info.plist` `CFBundleIdentifier`: `com.wechat.voicerecorder`
-- Xcode target build setting `PRODUCT_BUNDLE_IDENTIFIER`: `com.wechat.voicerecorder`
+- `Info.plist` `CFBundleIdentifier`: `cn.mistbit.voicememo`
+- Xcode target build setting `PRODUCT_BUNDLE_IDENTIFIER`: `cn.mistbit.voicememo`
 
 If Bundle ID changes, macOS treats the app as a new identity and will re-prompt for privacy permissions.
 

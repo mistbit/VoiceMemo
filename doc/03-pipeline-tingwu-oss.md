@@ -6,10 +6,10 @@ Document the manual pipeline executed from the UI after a recording is saved.
 
 ## Key Files
 
-- `Sources/WeChatVoiceRecorder/Views/PipelineView.swift`
-- `Sources/WeChatVoiceRecorder/Services/MeetingPipelineManager.swift`
-- `Sources/WeChatVoiceRecorder/Services/OSSService.swift`
-- `Sources/WeChatVoiceRecorder/Services/TingwuService.swift`
+- `Sources/VoiceMemo/Views/PipelineView.swift`
+- `Sources/VoiceMemo/Services/MeetingPipelineManager.swift`
+- `Sources/VoiceMemo/Services/OSSService.swift`
+- `Sources/VoiceMemo/Services/TingwuService.swift`
 
 ## Pipeline Managers
 
@@ -101,5 +101,5 @@ On success:
 - Sets `Authorization` header:
   - `ACS3-HMAC-SHA256 Credential=<akId>,SignedHeaders=<...>,Signature=<...>`
 
-The canonical request builder is tested in `Tests/WeChatVoiceRecorderTests/TingwuSignatureTests.swift`.
+The canonical request builder is tested in `Tests/VoiceMemoTests/TingwuSignatureTests.swift`.
 
