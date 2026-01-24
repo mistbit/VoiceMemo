@@ -2,12 +2,20 @@
 
 ## Purpose
 
-Describe how the app records “remote/system audio” and “local microphone audio”, then merges them into a single file to feed the pipeline.
+Describe how the app records “remote/system audio” and “local microphone audio”, and how it processes these files in different modes.
 
 ## Key Files
 
-- `Sources/WeChatVoiceRecorder/AudioRecorder.swift`
-- `Sources/WeChatVoiceRecorder/Info.plist` (usage descriptions)
+- `Sources/VoiceMemo/AudioRecorder.swift`
+- `Sources/VoiceMemo/Models/MeetingTask.swift` (contains `MeetingMode` definition)
+- `Sources/VoiceMemo/Info.plist` (usage descriptions)
+
+## Recording Modes
+
+The app supports two modes:
+
+1. **Mixed Mode**: Merges both audio tracks into a single `mixed.m4a` file after recording ends, for single-channel pipeline processing.
+2. **Separated Mode**: Skips the merge step and keeps the original two audio files, for dual-channel independent processing and alignment pipeline.
 
 ## Track Definitions
 
@@ -20,7 +28,7 @@ Both tracks are encoded as AAC in `.m4a` through `AVAssetWriter`.
 
 `AudioRecorder.beginRecordingSession` creates:
 
-- Folder: `~/Downloads/WeChatRecordings/`
+- Folder: `~/Downloads/VoiceMemoRecordings/`
 - Filenames:
   - `recording-<timestamp>-remote.m4a`
   - `recording-<timestamp>-local.m4a`
@@ -49,8 +57,14 @@ sequenceDiagram
   UI->>AR: stopRecording()
   AR->>SCK: stopCapture
   AR->>AVC: stopRunning
-  AR->>AR: mergeAudioFiles(remote, local) -> mixed
-  AR->>AR: create MeetingTask(localFilePath=mixed)
+  
+  alt Mixed Mode
+    AR->>AR: mergeAudioFiles(remote, local) -> mixed
+    AR->>AR: create MeetingTask(localFilePath=mixed, mode=.mixed)
+  else Separated Mode
+    AR->>AR: skip merge
+    AR->>AR: create MeetingTask(remote, local, mode=.separated)
+  end
 ```
 
 ## Merge Strategy
@@ -82,4 +96,3 @@ For ScreenCaptureKit audio capture:
 - Mic permission denied: local track missing; recording can still proceed depending on state.
 - Writer setup fails: invalid stream description (sample rate or channels = 0).
 - Export fails: composition export error; merge result not generated.
-

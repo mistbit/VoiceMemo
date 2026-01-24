@@ -1,5 +1,5 @@
 import XCTest
-@testable import WeChatVoiceRecorder
+@testable import VoiceMemo
 
 final class OSSUploadTests: XCTestCase {
     private let ossAccessKeyId = "YOUR_ACCESS_KEY_ID"

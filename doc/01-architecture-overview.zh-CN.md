@@ -11,17 +11,18 @@
 
 ## 目录结构
 
-- `Sources/WeChatVoiceRecorder/`
-  - `WeChatVoiceRecorderApp.swift`：应用入口与 AppDelegate（激活策略）。
+- `Sources/VoiceMemo/`
+  - `VoiceMemoApp.swift`：应用入口与 AppDelegate（激活策略）。
   - `ContentView.swift`：应用骨架、导航与状态装配。
-  - `AudioRecorder.swift`：双轨录音与本地合成。
+  - `AudioRecorder.swift`：双轨录音与本地合成（支持混合与分离两种模式）。
   - `Models/MeetingTask.swift`：任务模型与状态机。
   - `Services/`
     - `SettingsStore.swift`：配置、功能开关、日志。
     - `KeychainHelper.swift`：Keychain 密钥存储（RAM AK/Secret）。
-    - `OSSService.swift`：上传合成音频到 OSS。
+    - `OSSService.swift`：上传音频到 OSS。
     - `TingwuService.swift`：创建听悟离线任务 + 查询任务信息。
-    - `MeetingPipelineManager.swift`：串联转码/上传/创建/轮询并写入数据库。
+    - `MeetingPipelineManager.swift`：混合模式流水线（串联转码/上传/创建/轮询并写入数据库）。
+    - `SeparatedMeetingPipelineManager.swift`：分离模式流水线（独立处理双路音频并对齐）。
     - `DatabaseManager.swift`：SQLite 任务持久化。
     - `HistoryStore.swift`：历史列表的 Observable 包装。
   - `Views/`：SwiftUI 界面（录音、流水线、结果、设置、历史）。
@@ -49,16 +50,22 @@ flowchart TD
   B --> D[AVCaptureSession 采集麦克风]
   C --> E[remote.m4a]
   D --> F[local.m4a]
-  E --> G[AVMutableComposition 合成]
-  F --> G
-  G --> H[mixed.m4a]
-  H --> I[创建 MeetingTask + 写入 SQLite]
-  I --> J[PipelineView 手动节点]
-  J --> K[转码 mixed -> mixed_48k.m4a]
-  K --> L[上传 OSS -> 公网 URL]
-  L --> M[创建听悟任务 -> taskId]
-  M --> N[轮询任务状态]
-  N --> O[保存转写/总结/原始 JSON]
+  
+  E --> G1{识别模式}
+  F --> G1
+  
+  G1 -->|混合模式| H1[AVMutableComposition 合成]
+  H1 --> H2[mixed.m4a]
+  H2 --> I1[创建 MeetingTask]
+  I1 --> J1[MeetingPipelineManager]
+  
+  G1 -->|分离模式| I2[创建 MeetingTask]
+  I2 --> J2[SeparatedMeetingPipelineManager]
+  
+  J1 --> K[转码/上传/听悟/轮询]
+  J2 --> K
+  
+  K --> O[保存转写/总结/对齐结果]
   O --> P[ResultView 导出 Markdown]
 ```
 

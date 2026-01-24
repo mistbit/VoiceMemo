@@ -3,7 +3,7 @@
 # 设置错误即停止
 set -e
 
-APP_NAME="WeChatVoiceRecorder"
+APP_NAME="VoiceMemo"
 BUILD_DIR=".build/release"
 APP_BUNDLE="$APP_NAME.app"
 CONTENTS_DIR="$APP_BUNDLE/Contents"
@@ -20,9 +20,9 @@ mkdir -p "$RESOURCES_DIR"
 
 echo "Step 3: Copying binary, Info.plist and AppIcon..."
 cp ".build/release/$APP_NAME" "$MACOS_DIR/"
-cp "Sources/WeChatVoiceRecorder/Info.plist" "$CONTENTS_DIR/"
-if [ -f "Sources/WeChatVoiceRecorder/Resources/AppIcon.icns" ]; then
-    cp "Sources/WeChatVoiceRecorder/Resources/AppIcon.icns" "$RESOURCES_DIR/"
+cp "Sources/VoiceMemo/Info.plist" "$CONTENTS_DIR/"
+if [ -f "Sources/VoiceMemo/Resources/AppIcon.icns" ]; then
+    cp "Sources/VoiceMemo/Resources/AppIcon.icns" "$RESOURCES_DIR/"
 fi
 
 echo "Step 4: Signing the application (ad-hoc)..."

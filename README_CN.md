@@ -1,4 +1,4 @@
-# WeChatVoiceRecorder (微信语音录制器)
+# VoiceMemo
 
 一款专业、高保真的 macOS 音频录制工具，专为捕获微信实时语音通话设计。基于 macOS 原生的 **ScreenCaptureKit** 和 **AVFoundation** 框架构建。
 
@@ -13,6 +13,17 @@ English version: [README.md](README.md)
 - **隐私优先**：所有处理均在本地完成，具有清晰的权限管理机制。
 - **会议纪要（阿里云听悟 + OSS）**：手动触发流水线进行转写和结构化纪要生成（摘要 / 要点 / 待办），并支持导出 Markdown。
 
+## 更新日志
+
+请参阅 [CHANGELOG.md](CHANGELOG.md) 查看完整的发布历史。
+
+## 识别模式
+
+应用现在支持两种识别模式，以适应不同的会议场景：
+
+- **混合模式 (默认)**：将所有音频源合并为单个音轨。适用于普通录音和简单的转写需求。
+- **双人分离模式**：专为 1-on-1 通话设计。系统音频被视为 Speaker 2（远端），麦克风被视为 Speaker 1（本地）。两个音轨将独立进行识别，在最终的纪要中提供更好的说话人识别和对话对齐。
+
 ## 环境要求
 
 - **操作系统**：macOS 13.0 (Ventura) 或更高版本。
@@ -24,8 +35,9 @@ English version: [README.md](README.md)
 ```mermaid
 flowchart LR
   subgraph Local["本地（macOS App）"]
-    A["AudioRecorder<br/>ScreenCaptureKit + AVFoundation"] --> B["音轨合并<br/>对方 + 自己"]
-    B --> C["MeetingTask"]
+    A["AudioRecorder<br/>ScreenCaptureKit + AVFoundation"] -->|混合模式| B["音轨合并<br/>对方 + 自己"]
+    A -->|分离模式| C["MeetingTask"]
+    B --> C
     C --> D["MeetingPipelineManager<br/>状态机流水线"]
     D -->|转码| E["AVAssetExportSession<br/>mixed_48k.m4a"]
     D -->|持久化| J["DatabaseManager<br/>SQLite"]
@@ -60,7 +72,7 @@ flowchart LR
 ```bash
 chmod +x package_app.sh
 ./package_app.sh
-open WeChatVoiceRecorder.app
+open VoiceMemo.app
 ```
 
 ### 2. 权限说明

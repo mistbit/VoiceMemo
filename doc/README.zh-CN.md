@@ -1,4 +1,4 @@
-# WeChatVoiceRecorder 文档
+# VoiceMemo 文档
 
 - 从这里开始：01-architecture-overview.zh-CN.md
 - English entry: README.md
@@ -12,4 +12,5 @@
 - 04-storage-and-settings.zh-CN.md
 - 05-permissions-and-signing.zh-CN.md
 - 06-testing.zh-CN.md
+- 07-dual-speaker-separate-pipeline.zh-CN.md
 

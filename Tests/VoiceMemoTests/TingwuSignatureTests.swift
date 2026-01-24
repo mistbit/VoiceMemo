@@ -1,6 +1,6 @@
 import XCTest
 import CryptoKit
-@testable import WeChatVoiceRecorder
+@testable import VoiceMemo
 
 final class TingwuSignatureTests: XCTestCase {
     func testCanonicalRequestMatchesServerExample() {

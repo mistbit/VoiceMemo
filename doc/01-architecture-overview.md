@@ -11,17 +11,18 @@ This document explains how the app is structured end-to-end: UI, recording, pipe
 
 ## Key Directories
 
-- `Sources/WeChatVoiceRecorder/`
-  - `WeChatVoiceRecorderApp.swift`: app entry and AppDelegate activation policy.
+- `Sources/VoiceMemo/`
+  - `VoiceMemoApp.swift`: app entry and AppDelegate activation policy.
   - `ContentView.swift`: app shell, navigation, and state wiring.
-  - `AudioRecorder.swift`: dual-track audio capture and local merge.
+  - `AudioRecorder.swift`: dual-track audio capture and local merge (supports both mixed and separated modes).
   - `Models/MeetingTask.swift`: persisted task model and status state machine.
   - `Services/`
     - `SettingsStore.swift`: user configuration, feature toggles, logging.
     - `KeychainHelper.swift`: secret storage (RAM AK/Secret) in Keychain.
-    - `OSSService.swift`: upload merged audio to OSS.
+    - `OSSService.swift`: upload audio to OSS.
     - `TingwuService.swift`: create Tingwu offline task + poll task info.
-    - `MeetingPipelineManager.swift`: orchestrates transcode/upload/create/poll and persistence.
+    - `MeetingPipelineManager.swift`: mixed mode pipeline (orchestrates transcode/upload/create/poll and persistence).
+    - `SeparatedMeetingPipelineManager.swift`: separated mode pipeline (independent processing of dual tracks and alignment).
     - `DatabaseManager.swift`: SQLite persistence for task history.
     - `HistoryStore.swift`: observable wrapper for history list.
   - `Views/`: SwiftUI screens (recording, pipeline, results, settings, history).
@@ -49,16 +50,22 @@ flowchart TD
   B --> D[Mic audio via AVCaptureSession]
   C --> E[remote.m4a]
   D --> F[local.m4a]
-  E --> G[Merge with AVMutableComposition]
-  F --> G
-  G --> H[mixed.m4a]
-  H --> I[Create MeetingTask + save to SQLite]
-  I --> J[PipelineView manual steps]
-  J --> K[Transcode mixed -> mixed_48k.m4a]
-  K --> L[Upload to OSS -> public URL]
-  L --> M[Create Tingwu task -> taskId]
-  M --> N[Poll task status]
-  N --> O[Persist transcript/summary/raw JSON]
+  
+  E --> G1{Recognition Mode}
+  F --> G1
+  
+  G1 -->|Mixed Mode| H1[Merge with AVMutableComposition]
+  H1 --> H2[mixed.m4a]
+  H2 --> I1[Create MeetingTask]
+  I1 --> J1[MeetingPipelineManager]
+  
+  G1 -->|Separated Mode| I2[Create MeetingTask]
+  I2 --> J2[SeparatedMeetingPipelineManager]
+  
+  J1 --> K[Transcode/Upload/Tingwu/Poll]
+  J2 --> K
+  
+  K --> O[Persist transcript/summary/aligned results]
   O --> P[ResultView export Markdown]
 ```
 

@@ -2,12 +2,20 @@
 
 ## 文档目的
 
-说明应用如何同时录制“远端/系统音频”和“本地麦克风音频”，以及停止录音后如何合成为单个音频文件供流水线处理。
+说明应用如何同时录制“远端/系统音频”和“本地麦克风音频”，以及在不同模式下如何处理这些音频文件。
 
 ## 关键文件
 
-- `Sources/WeChatVoiceRecorder/AudioRecorder.swift`
-- `Sources/WeChatVoiceRecorder/Info.plist`（权限说明文案）
+- `Sources/VoiceMemo/AudioRecorder.swift`
+- `Sources/VoiceMemo/Models/MeetingTask.swift` (包含 `MeetingMode` 定义)
+- `Sources/VoiceMemo/Info.plist`（权限说明文案）
+
+## 录制模式
+
+应用支持两种模式：
+
+1. **混合模式 (Mixed)**：录音结束后将两路音频合成为一个 `mixed.m4a` 文件，供后续单路转写流水线使用。
+2. **分离模式 (Separated)**：跳过合成步骤，直接保留原始的两路音频文件，供后续双路独立转写与对齐流水线使用。
 
 ## 双轨定义
 
@@ -20,7 +28,7 @@
 
 `AudioRecorder.beginRecordingSession` 会创建：
 
-- 目录：`~/Downloads/WeChatRecordings/`
+- 目录：`~/Downloads/VoiceMemoRecordings/`
 - 文件名：
   - `recording-<timestamp>-remote.m4a`
   - `recording-<timestamp>-local.m4a`
@@ -49,8 +57,14 @@ sequenceDiagram
   UI->>AR: stopRecording()
   AR->>SCK: stopCapture
   AR->>AVC: stopRunning
-  AR->>AR: mergeAudioFiles(remote, local) -> mixed
-  AR->>AR: 创建 MeetingTask(localFilePath=mixed)
+  
+  alt 混合模式 (Mixed)
+    AR->>AR: mergeAudioFiles(remote, local) -> mixed
+    AR->>AR: 创建 MeetingTask(localFilePath=mixed, mode=.mixed)
+  else 分离模式 (Separated)
+    AR->>AR: 跳过合成
+    AR->>AR: 创建 MeetingTask(remote, local, mode=.separated)
+  end
 ```
 
 ## 合成策略
@@ -82,4 +96,3 @@ ScreenCaptureKit 采集系统音频需要：
 - 麦克风权限拒绝：本地轨为空；具体表现取决于运行时状态。
 - 写入器初始化失败：音频格式描述异常（采样率/声道为 0）。
 - 导出失败：合成导出报错，无法生成 mixed 文件。
-

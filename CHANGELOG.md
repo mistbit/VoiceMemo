@@ -1,0 +1,21 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0] - 2026-01-22
+
+### Added
+- **Dual-Track Recording**: Simultaneously capture system audio (WeChat/Remote) and microphone input (Local).
+- **Automatic Audio Merging**: Intelligent mixing of remote and local tracks into a single `mixed.m4a` file.
+- **AI Meeting Minutes Pipeline**:
+  - Integration with **Alibaba Cloud OSS** for audio storage.
+  - Integration with **Alibaba Cloud Tingwu** for ASR and intelligent summary generation.
+  - Support for manual pipeline triggers: Transcode, Upload, Create Task, and Result Retrieval.
+- **Persistence**: SQLite-based history management for recordings and AI tasks.
+- **Security**: Keychain integration for sensitive Alibaba Cloud credentials (AK/SK).
+- **Modern UI**: SwiftUI-based interface with dedicated views for Recording, History, Settings, and AI Pipeline.
+- **Developer Tools**: `package_app.sh` script for automated building and ad-hoc signing.
+- **Comprehensive Documentation**: Detailed architecture and module-specific docs in English and Chinese.

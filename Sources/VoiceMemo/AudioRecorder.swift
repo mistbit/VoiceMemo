@@ -26,7 +26,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     private var stream: SCStream?
     private var remoteAssetWriter: AVAssetWriter?
     private var remoteAssetWriterInput: AVAssetWriterInput?
-    private let remoteQueue = DispatchQueue(label: "com.wechatvoicerecorder.remote")
+    private let remoteQueue = DispatchQueue(label: "cn.mistbit.voicememo.remote")
     private var isFirstRemoteBuffer = true
     private var remoteURL: URL?
     
@@ -34,7 +34,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     private var micSession: AVCaptureSession?
     private var micAssetWriter: AVAssetWriter?
     private var micAssetWriterInput: AVAssetWriterInput?
-    private let micQueue = DispatchQueue(label: "com.wechatvoicerecorder.mic")
+    private let micQueue = DispatchQueue(label: "cn.mistbit.voicememo.mic")
     private var isFirstMicBuffer = true
     private var localURL: URL?
     
@@ -105,7 +105,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         
         let fileManager = FileManager.default
         let downloads = fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first!
-        let folder = downloads.appendingPathComponent("WeChatRecordings")
+        let folder = downloads.appendingPathComponent("VoiceMemoRecordings")
         try? fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
         
         self.remoteURL = folder.appendingPathComponent("recording-\(dateStr)-remote.m4a")
@@ -336,7 +336,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                         try await mergeAudioFiles(audio1: rURL, audio2: lURL, output: mixedURL)
                         await MainActor.run {
                             self.isRecording = false
-                            self.statusMessage = "Saved 3 files to Downloads/WeChatRecordings"
+                            self.statusMessage = "Saved 3 files to Downloads/VoiceMemoRecordings"
                             
                             // Create Meeting Task
                             let title = "Meeting \(recId)"
@@ -357,7 +357,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                     settings.log("Separated mode: Skip merge. remote=\(rURL.path) local=\(lURL.path)")
                     await MainActor.run {
                         self.isRecording = false
-                        self.statusMessage = "Saved 2 files (Separated) to Downloads/WeChatRecordings"
+                        self.statusMessage = "Saved 2 files (Separated) to Downloads/VoiceMemoRecordings"
                         
                         let title = "Meeting \(recId) (Separated)"
                         // Use Mic (Local) as primary display file

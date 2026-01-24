@@ -6,6 +6,11 @@ struct HistoryView: View {
     @Binding var isRecordingMode: Bool
     
     @State private var searchText = ""
+    @State private var pendingDeleteTask: MeetingTask?
+    @State private var isShowingDeleteAlert = false
+    @State private var taskToRename: MeetingTask?
+    @State private var newTitle: String = ""
+    @State private var isShowingRenameAlert = false
     
     var filteredTasks: [MeetingTask] {
         if searchText.isEmpty {
@@ -66,6 +71,24 @@ struct HistoryView: View {
                         }
                         .padding(.vertical, 6)
                     }
+                    .contextMenu {
+                        Button {
+                            taskToRename = task
+                            newTitle = task.title
+                            isShowingRenameAlert = true
+                        } label: {
+                            Label("Rename", systemImage: "pencil")
+                        }
+
+                        Divider()
+
+                        Button(role: .destructive) {
+                            pendingDeleteTask = task
+                            isShowingDeleteAlert = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
                 .onDelete(perform: deleteItems)
             }
@@ -79,11 +102,51 @@ struct HistoryView: View {
             }) {
                 Image(systemName: "arrow.clockwise")
             }
+            if let selectedTask {
+                Button(role: .destructive) {
+                    pendingDeleteTask = selectedTask
+                    isShowingDeleteAlert = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+            }
+        }
+        .alert("Delete Meeting?", isPresented: $isShowingDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                if let task = pendingDeleteTask {
+                    store.deleteTask(task)
+                    if selectedTask?.id == task.id {
+                        selectedTask = nil
+                    }
+                }
+                pendingDeleteTask = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDeleteTask = nil
+            }
+        } message: {
+            Text("This action cannot be undone.")
+        }
+        .alert("Rename Meeting", isPresented: $isShowingRenameAlert) {
+            TextField("New Title", text: $newTitle)
+            Button("Save") {
+                if let task = taskToRename, !newTitle.isEmpty {
+                    store.updateTitle(for: task, newTitle: newTitle)
+                    // If the currently selected task is the one being renamed, we might need to update the detail view's identity or just let the binding handle it if it's reactive enough.
+                }
+                taskToRename = nil
+            }
+            Button("Cancel", role: .cancel) {
+                taskToRename = nil
+            }
         }
     }
     
     private func deleteItems(offsets: IndexSet) {
-        store.deleteTask(at: offsets)
+        let tasksToDelete = offsets.compactMap { index in
+            filteredTasks.indices.contains(index) ? filteredTasks[index] : nil
+        }
+        store.deleteTasks(tasksToDelete)
         if let selected = selectedTask, !store.tasks.contains(where: { $0.id == selected.id }) {
             selectedTask = nil
         }

@@ -3,7 +3,7 @@ import Security
 
 class KeychainHelper {
     static let shared = KeychainHelper()
-    private let service = "com.wechatvoicerecorder.secrets"
+    private let service = "cn.mistbit.voicememo.secrets"
     
     private init() {}
     
