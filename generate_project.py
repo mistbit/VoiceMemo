@@ -1,7 +1,7 @@
 import os
 import hashlib
 
-PROJECT_NAME = "WeChatVoiceRecorder"
+PROJECT_NAME = "VoiceMemo"
 BUNDLE_ID = "com.wechat.voicerecorder"
 SOURCES_DIR = "Sources/WeChatVoiceRecorder"
 ENTITLEMENTS_PATH = "WeChatVoiceRecorder.entitlements"
