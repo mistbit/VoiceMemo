@@ -11,7 +11,7 @@ struct RecordingView: View {
                 // Header & Status
                 HStack(alignment: .center) {
                     Text("New Recording")
-                        .font(.system(size: 32, weight: .bold))
+                        .font(.system(size: 26, weight: .semibold))
                     
                     Spacer()
                     
@@ -39,19 +39,41 @@ struct RecordingView: View {
                         Spacer()
                         
                         HStack(spacing: 12) {
-                            Picker("", selection: $recorder.selectedApp) {
-                                Text("Select an App").tag(nil as SCRunningApplication?)
-                                ForEach(recorder.availableApps, id: \.processID) { app in
-                                    Text(app.applicationName).tag(app as SCRunningApplication?)
+                            Menu {
+                                Button("Select an App") {
+                                    recorder.selectedApp = nil
                                 }
+                                
+                                ForEach(recorder.availableApps, id: \.processID) { app in
+                                    Button(app.applicationName) {
+                                        recorder.selectedApp = app
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Text(recorder.selectedApp?.applicationName ?? "Select an App")
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(.secondary)
+                                }
+                                .font(.system(size: 13))
+                                .foregroundColor(.primary)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 10)
+                                .frame(width: 240)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color(nsColor: .controlBackgroundColor))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+                                )
                             }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .frame(width: 200)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                            )
+                            .buttonStyle(.plain)
                             
                             Button(action: {
                                 Task { await recorder.refreshAvailableApps() }
