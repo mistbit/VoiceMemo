@@ -341,7 +341,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                             // Create Meeting Task
                             let title = "Meeting \(recId)"
                             let task = MeetingTask(recordingId: recId, localFilePath: mixedURL.path, title: title)
-                            DatabaseManager.shared.saveTask(task)
+                            Task { try? await StorageManager.shared.currentProvider.saveTask(task) }
                             self.latestTask = task
                         }
                         settings.log("Merge success: mixed=\(mixedURL.path)")
@@ -366,7 +366,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                         task.speaker1AudioPath = lURL.path // Mic (Local) -> Speaker 1
                         task.speaker2AudioPath = rURL.path // System (Remote) -> Speaker 2
                         
-                        DatabaseManager.shared.saveTask(task)
+                        Task { try? await StorageManager.shared.currentProvider.saveTask(task) }
                         self.latestTask = task
                     }
                 }

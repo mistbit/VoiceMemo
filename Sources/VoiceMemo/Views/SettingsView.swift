@@ -3,9 +3,12 @@ import AppKit
 
 struct SettingsView: View {
     @ObservedObject var settings: SettingsStore
+    @ObservedObject var storageManager = StorageManager.shared
     @State private var akIdInput: String = ""
     @State private var akSecretInput: String = ""
+    @State private var mysqlPasswordInput: String = ""
     @State private var testStatus: String = ""
+    @State private var mysqlTestStatus: String = ""
     @State private var showingLog = false
     @State private var logText = ""
     
@@ -112,6 +115,82 @@ struct SettingsView: View {
                 }
             }
             .tabItem { Text("Cloud") }
+            
+            // MARK: - Storage
+            Form {
+                Section(header: Text("Storage Type")) {
+                    Picker("Type", selection: $settings.storageType) {
+                        Text("Local (SQLite)").tag(SettingsStore.StorageType.local)
+                        Text("MySQL").tag(SettingsStore.StorageType.mysql)
+                    }
+                }
+                
+                if settings.storageType == .mysql {
+                    Section(header: Text("MySQL Configuration")) {
+                        TextField("Host", text: $settings.mysqlHost)
+                        TextField("Port", value: $settings.mysqlPort, formatter: NumberFormatter())
+                        TextField("User", text: $settings.mysqlUser)
+                        TextField("Database", text: $settings.mysqlDatabase)
+                        
+                        if settings.hasMySQLPassword {
+                            HStack {
+                                Text("Password: ******")
+                                Spacer()
+                                Button("Clear") {
+                                    settings.saveMySQLPassword("")
+                                }
+                            }
+                        } else {
+                            SecureField("Password", text: $mysqlPasswordInput)
+                            Button("Save Password") {
+                                settings.saveMySQLPassword(mysqlPasswordInput)
+                                mysqlPasswordInput = ""
+                            }
+                            .disabled(mysqlPasswordInput.isEmpty)
+                        }
+                    }
+                    
+                    Section(header: Text("Actions")) {
+                        Button("Test MySQL Connection") {
+                            Task {
+                                await testMySQL()
+                            }
+                        }
+                        if !mysqlTestStatus.isEmpty {
+                            Text(mysqlTestStatus)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Divider()
+                        
+                        Button("Sync Local to MySQL") {
+                            Task {
+                                await storageManager.syncToMySQL()
+                            }
+                        }
+                        .disabled(storageManager.isSyncing)
+                        
+                        if storageManager.isSyncing {
+                            ProgressView("Syncing...", value: storageManager.syncProgress, total: 1.0)
+                        }
+                        
+                        if let err = storageManager.syncError {
+                            Text("Sync Error: \(err)").foregroundColor(.red)
+                        }
+                    }
+                } else {
+                    Section(header: Text("MySQL")) {
+                        Text("Switch to MySQL mode to configure connection and sync local history.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Button("Go to MySQL Setup") {
+                            settings.storageType = .mysql
+                        }
+                    }
+                }
+            }
+            .tabItem { Text("Storage") }
         }
         .frame(width: 500, height: 400)
         .padding()
@@ -149,6 +228,16 @@ struct SettingsView: View {
         } catch {
             testStatus = "Failed: \(String(describing: error))"
             settings.log("OSS test upload failed: \(String(describing: error))")
+        }
+    }
+    
+    private func testMySQL() async {
+        mysqlTestStatus = "Testing..."
+        do {
+            try await storageManager.testMySQLConnection()
+            mysqlTestStatus = "Success! Connection established."
+        } catch {
+            mysqlTestStatus = "Failed: \(error.localizedDescription)"
         }
     }
 }

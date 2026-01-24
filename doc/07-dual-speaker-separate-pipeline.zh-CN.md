@@ -8,7 +8,7 @@
 ## 范围 / 非目标
 
 - 范围：双通道系统录音双轨输入；用户手动指定通道映射；基于采样帧时间戳；允许重叠片段标注；单路失败输出部分；纪要区分 speaker 行动项并保留单路纪要备份。
-- 非目标：不做说话人分离（单通道），不对现有混合流水线做复用或合并。
+- 非目标：不做说话人分离（单通道），保持混合模式兼容并在同一流水线内分支处理。
 
 ## 术语表
 
@@ -36,7 +36,7 @@ flowchart TD
 ## 关键需求约束（已确认）
 
 - 输入：系统录音双轨，强制双通道。
-- 通道映射：用户手动指定 speaker1/speaker2。
+- 通道映射（当前实现）：speaker1=麦克风（本地），speaker2=系统音频（远端）。
 - 时间基准：采样帧时间戳。
 - 对齐策略：允许同时间段冲突并标注重叠。
 - 摘要策略：区分 speaker 的行动项；保留单路纪要备份。
@@ -67,51 +67,23 @@ flowchart TD
 - 设置与特性开关：`Sources/VoiceMemo/Services/SettingsStore.swift`
 - 结果展示与导出：`Sources/VoiceMemo/Views/ResultView.swift`
 
-### 新增/扩展建议（不复用流水线）
+### 当前实现（已落地）
 
-- 新增模式枚举：`MeetingTaskRecognitionMode`
-  - `mixed`
-  - `separated`
-- 新增分离流水线管理器：`SeparatedMeetingPipelineManager`
-  - 仅用于分离模式任务
-  - 不依赖 `MeetingPipelineManager` 的任何逻辑复用
-- 新增对齐模块：`ConversationAligner`
-  - 输入：双路分段结果 + 采样帧时间戳
-  - 输出：统一时间轴的对话片段与重叠标记
-- 新增纪要模块：`SeparatedSummaryBuilder`
-  - 输入：对齐对话
-  - 输出：区分 speaker 的行动项与共同结论
-- 新增输出模型：`SeparatedRecognitionResult`
-  - `speaker1Transcript`
-  - `speaker2Transcript`
-  - `alignedConversation`
-  - `summary`
-  - `summaryBySpeaker`
-  - `summaryFallback`
-  - `completionStatus`
-  - `speaker1Status`
-  - `speaker2Status`
-  - `pipelineId`
-  - `pipelineVersion`
+- 模式枚举：`MeetingMode`（`mixed` / `separated`）
+- 分离模式流水线：`MeetingPipelineManager` 内按 `task.mode` 分支执行双路处理
+- 结果字段：`MeetingTask` 已包含 speaker1/2 音频路径、转写、状态与对齐字段（`alignedConversation` 预留）
 
 ## 数据模型与存储
 
-### MeetingTask 扩展建议
+### MeetingTask 字段（分离模式相关）
 
-- `recognitionMode`
-- `pipelineId`
-- `pipelineVersion`
-- `channelMapping`
-- `completionStatus`
-- `speaker1Status`
-- `speaker2Status`
-- `separatedTranscriptSpeaker1`
-- `separatedTranscriptSpeaker2`
+- `mode`
+- `speaker1AudioPath` / `speaker2AudioPath`
+- `speaker1Transcript` / `speaker2Transcript`
+- `speaker1Status` / `speaker2Status`
 - `alignedConversation`
-- `summaryBySpeaker`
-- `summaryFallback`
 
-### DatabaseManager 变更点
+### 存储层变更点（SQLiteStorage/MySQLStorage）
 
 - 新增字段列，存储分离模式结果与状态标记。
 - 保持混合模式字段不变。
@@ -120,7 +92,7 @@ flowchart TD
 
 1. 输入校验
    - 双通道文件存在、时长有效。
-   - 用户已完成通道映射。
+   - 通道映射为固定策略，无需额外配置。
 
 2. 分路识别
    - 以采样帧时间为基准生成时间戳。

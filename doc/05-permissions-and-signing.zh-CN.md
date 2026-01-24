@@ -51,7 +51,8 @@ macOS 隐私权限授权与“应用身份 + 签名”绑定。
 
 - Bundle ID 固定不变
 - Xcode 中固定 Team，并使用 Automatic signing
-- 避免重生成 Xcode 工程导致 `DEVELOPMENT_TEAM` 被清空
+- 如果使用生成的 `VoiceMemo.xcodeproj`，在依赖变更后请重新运行 `generate_project.py`，保证 SwiftPM 依赖引用一致
+  - 若 Xcode 出现 `No such module`，可尝试 `File > Packages > Reset Package Caches`，再 Clean Build Folder
 
 打包脚本说明：
 
@@ -62,4 +63,3 @@ macOS 隐私权限授权与“应用身份 + 签名”绑定。
 
 - 调试：优先使用 Xcode + 自动签名 + 固定 Team。
 - 打包脚本：适合快速本地运行/分发测试；若要减少弹窗，需要改为稳定签名策略。
-

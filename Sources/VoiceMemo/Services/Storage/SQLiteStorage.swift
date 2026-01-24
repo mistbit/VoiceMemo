@@ -1,9 +1,7 @@
 import Foundation
 import SQLite
 
-class DatabaseManager {
-    static let shared = DatabaseManager()
-    
+class SQLiteStorage: StorageProvider {
     private var db: Connection?
     
     // Table Definition
@@ -47,7 +45,7 @@ class DatabaseManager {
     private let speaker1Status = Expression<String?>("speaker1_status")
     private let speaker2Status = Expression<String?>("speaker2_status")
     
-    private init() {
+    init() {
         setupDatabase()
     }
     
@@ -173,130 +171,186 @@ class DatabaseManager {
         return names
     }
     
-    // CRUD Operations
+    // MARK: - StorageProvider
     
-    func saveTask(_ task: MeetingTask) {
+    func saveTask(_ task: MeetingTask) async throws {
         guard let db = db else { return }
         
-        do {
-            let insert = tasks.insert(or: .replace,
-                id <- task.id.uuidString,
-                createdAt <- task.createdAt,
-                recordingId <- task.recordingId,
-                localFilePath <- task.localFilePath,
-                ossUrl <- task.ossUrl,
-                tingwuTaskId <- task.tingwuTaskId,
-                status <- task.status.rawValue,
-                title <- task.title,
-                rawResponse <- task.rawResponse,
-                transcript <- task.transcript,
-                summary <- task.summary,
-                keyPoints <- task.keyPoints,
-                actionItems <- task.actionItems,
-                lastError <- task.lastError,
-                taskKey <- task.taskKey,
-                apiStatus <- task.apiStatus,
-                statusText <- task.statusText,
-                bizDuration <- task.bizDuration,
-                outputMp3Path <- task.outputMp3Path,
-                lastSuccessfulStatus <- task.lastSuccessfulStatus?.rawValue,
-                failedStep <- task.failedStep?.rawValue,
-                retryCount <- task.retryCount,
-                mode <- task.mode.rawValue,
-                speaker1AudioPath <- task.speaker1AudioPath,
-                speaker2AudioPath <- task.speaker2AudioPath,
-                speaker2OssUrl <- task.speaker2OssUrl,
-                speaker2TingwuTaskId <- task.speaker2TingwuTaskId,
-                speaker1Transcript <- task.speaker1Transcript,
-                speaker2Transcript <- task.speaker2Transcript,
-                alignedConversation <- task.alignedConversation,
-                speaker1Status <- task.speaker1Status?.rawValue,
-                speaker2Status <- task.speaker2Status?.rawValue
-            )
-            try db.run(insert)
-        } catch {
-            print("Save task error: \(error)")
-        }
+        let insert = tasks.insert(or: .replace,
+            id <- task.id.uuidString,
+            createdAt <- task.createdAt,
+            recordingId <- task.recordingId,
+            localFilePath <- task.localFilePath,
+            ossUrl <- task.ossUrl,
+            tingwuTaskId <- task.tingwuTaskId,
+            status <- task.status.rawValue,
+            title <- task.title,
+            rawResponse <- task.rawResponse,
+            transcript <- task.transcript,
+            summary <- task.summary,
+            keyPoints <- task.keyPoints,
+            actionItems <- task.actionItems,
+            lastError <- task.lastError,
+            taskKey <- task.taskKey,
+            apiStatus <- task.apiStatus,
+            statusText <- task.statusText,
+            bizDuration <- task.bizDuration,
+            outputMp3Path <- task.outputMp3Path,
+            lastSuccessfulStatus <- task.lastSuccessfulStatus?.rawValue,
+            failedStep <- task.failedStep?.rawValue,
+            retryCount <- task.retryCount,
+            mode <- task.mode.rawValue,
+            speaker1AudioPath <- task.speaker1AudioPath,
+            speaker2AudioPath <- task.speaker2AudioPath,
+            speaker2OssUrl <- task.speaker2OssUrl,
+            speaker2TingwuTaskId <- task.speaker2TingwuTaskId,
+            speaker1Transcript <- task.speaker1Transcript,
+            speaker2Transcript <- task.speaker2Transcript,
+            alignedConversation <- task.alignedConversation,
+            speaker1Status <- task.speaker1Status?.rawValue,
+            speaker2Status <- task.speaker2Status?.rawValue
+        )
+        try db.run(insert)
     }
     
-    func fetchTasks() -> [MeetingTask] {
+    func fetchTasks() async throws -> [MeetingTask] {
         guard let db = db else { return [] }
         
         var results: [MeetingTask] = []
         
-        do {
-            for row in try db.prepare(tasks.order(createdAt.desc)) {
-                var task = MeetingTask(
-                    recordingId: row[recordingId],
-                    localFilePath: row[localFilePath],
-                    title: row[title]
-                )
-                
-                if let uuid = UUID(uuidString: row[id]) {
-                    task.id = uuid
-                }
-                task.createdAt = row[createdAt]
-                task.ossUrl = row[ossUrl]
-                task.tingwuTaskId = row[tingwuTaskId]
-                if let statusEnum = MeetingTaskStatus(rawValue: row[status]) {
-                    task.status = statusEnum
-                }
-                task.rawResponse = row[rawResponse]
-                task.transcript = row[transcript]
-                task.summary = row[summary]
-                task.keyPoints = row[keyPoints]
-                task.actionItems = row[actionItems]
-                task.lastError = row[lastError]
-                task.taskKey = row[taskKey]
-                task.apiStatus = row[apiStatus]
-                task.statusText = row[statusText]
-                task.bizDuration = row[bizDuration]
-                task.outputMp3Path = row[outputMp3Path]
-                
-                if let successStatusRaw = row[lastSuccessfulStatus], let successStatus = MeetingTaskStatus(rawValue: successStatusRaw) {
-                    task.lastSuccessfulStatus = successStatus
-                }
-                if let failedStatusRaw = row[failedStep], let failedStepEnum = MeetingTaskStatus(rawValue: failedStatusRaw) {
-                    task.failedStep = failedStepEnum
-                }
-                task.retryCount = row[retryCount]
-                
-                if let modeRaw = try? row.get(mode), let modeEnum = MeetingMode(rawValue: modeRaw) {
-                    task.mode = modeEnum
-                }
-                task.speaker1AudioPath = row[speaker1AudioPath]
-                task.speaker2AudioPath = row[speaker2AudioPath]
-                task.speaker2OssUrl = row[speaker2OssUrl]
-                task.speaker2TingwuTaskId = row[speaker2TingwuTaskId]
-                task.speaker1Transcript = row[speaker1Transcript]
-                task.speaker2Transcript = row[speaker2Transcript]
-                task.alignedConversation = row[alignedConversation]
-                
-                if let s1StatusRaw = row[speaker1Status], let s1StatusEnum = MeetingTaskStatus(rawValue: s1StatusRaw) {
-                    task.speaker1Status = s1StatusEnum
-                }
-                if let s2StatusRaw = row[speaker2Status], let s2StatusEnum = MeetingTaskStatus(rawValue: s2StatusRaw) {
-                    task.speaker2Status = s2StatusEnum
-                }
-                
-                results.append(task)
+        for row in try db.prepare(tasks.order(createdAt.desc)) {
+            var task = MeetingTask(
+                recordingId: row[recordingId],
+                localFilePath: row[localFilePath],
+                title: row[title]
+            )
+            
+            if let uuid = UUID(uuidString: row[id]) {
+                task.id = uuid
             }
-        } catch {
-            print("Fetch tasks error: \(error)")
+            task.createdAt = row[createdAt]
+            task.ossUrl = row[ossUrl]
+            task.tingwuTaskId = row[tingwuTaskId]
+            if let statusEnum = MeetingTaskStatus(rawValue: row[status]) {
+                task.status = statusEnum
+            }
+            task.rawResponse = row[rawResponse]
+            task.transcript = row[transcript]
+            task.summary = row[summary]
+            task.keyPoints = row[keyPoints]
+            task.actionItems = row[actionItems]
+            task.lastError = row[lastError]
+            task.taskKey = row[taskKey]
+            task.apiStatus = row[apiStatus]
+            task.statusText = row[statusText]
+            task.bizDuration = row[bizDuration]
+            task.outputMp3Path = row[outputMp3Path]
+            
+            if let successStatusRaw = row[lastSuccessfulStatus], let successStatus = MeetingTaskStatus(rawValue: successStatusRaw) {
+                task.lastSuccessfulStatus = successStatus
+            }
+            if let failedStatusRaw = row[failedStep], let failedStepEnum = MeetingTaskStatus(rawValue: failedStatusRaw) {
+                task.failedStep = failedStepEnum
+            }
+            task.retryCount = row[retryCount]
+            
+            if let modeRaw = try? row.get(mode), let modeEnum = MeetingMode(rawValue: modeRaw) {
+                task.mode = modeEnum
+            }
+            task.speaker1AudioPath = row[speaker1AudioPath]
+            task.speaker2AudioPath = row[speaker2AudioPath]
+            task.speaker2OssUrl = row[speaker2OssUrl]
+            task.speaker2TingwuTaskId = row[speaker2TingwuTaskId]
+            task.speaker1Transcript = row[speaker1Transcript]
+            task.speaker2Transcript = row[speaker2Transcript]
+            task.alignedConversation = row[alignedConversation]
+            
+            if let s1StatusRaw = row[speaker1Status], let s1StatusEnum = MeetingTaskStatus(rawValue: s1StatusRaw) {
+                task.speaker1Status = s1StatusEnum
+            }
+            if let s2StatusRaw = row[speaker2Status], let s2StatusEnum = MeetingTaskStatus(rawValue: s2StatusRaw) {
+                task.speaker2Status = s2StatusEnum
+            }
+            
+            results.append(task)
         }
         
         return results
     }
     
-    func deleteTask(id: UUID) {
+    func deleteTask(id: UUID) async throws {
         guard let db = db else { return }
         let task = tasks.filter(self.id == id.uuidString)
-        _ = try? db.run(task.delete())
+        _ = try db.run(task.delete())
     }
-
-    func updateTaskTitle(id: UUID, newTitle: String) {
+    
+    func updateTaskTitle(id: UUID, newTitle: String) async throws {
         guard let db = db else { return }
         let task = tasks.filter(self.id == id.uuidString)
-        _ = try? db.run(task.update(title <- newTitle))
+        _ = try db.run(task.update(title <- newTitle))
+    }
+    
+    func getTask(id: UUID) async throws -> MeetingTask? {
+        guard let db = db else { return nil }
+        let query = tasks.filter(self.id == id.uuidString)
+        
+        guard let row = try db.pluck(query) else { return nil }
+        
+        var task = MeetingTask(
+            recordingId: row[recordingId],
+            localFilePath: row[localFilePath],
+            title: row[title]
+        )
+        
+        if let uuid = UUID(uuidString: row[self.id]) {
+            task.id = uuid
+        }
+        task.createdAt = row[createdAt]
+        task.ossUrl = row[ossUrl]
+        task.tingwuTaskId = row[tingwuTaskId]
+        if let statusEnum = MeetingTaskStatus(rawValue: row[status]) {
+            task.status = statusEnum
+        }
+        // ... (rest of mapping) ...
+        // To avoid code duplication, I should refactor the mapping logic, but for now I'll just copy it.
+        task.rawResponse = row[rawResponse]
+        task.transcript = row[transcript]
+        task.summary = row[summary]
+        task.keyPoints = row[keyPoints]
+        task.actionItems = row[actionItems]
+        task.lastError = row[lastError]
+        task.taskKey = row[taskKey]
+        task.apiStatus = row[apiStatus]
+        task.statusText = row[statusText]
+        task.bizDuration = row[bizDuration]
+        task.outputMp3Path = row[outputMp3Path]
+        
+        if let successStatusRaw = row[lastSuccessfulStatus], let successStatus = MeetingTaskStatus(rawValue: successStatusRaw) {
+            task.lastSuccessfulStatus = successStatus
+        }
+        if let failedStatusRaw = row[failedStep], let failedStepEnum = MeetingTaskStatus(rawValue: failedStatusRaw) {
+            task.failedStep = failedStepEnum
+        }
+        task.retryCount = row[retryCount]
+        
+        if let modeRaw = try? row.get(mode), let modeEnum = MeetingMode(rawValue: modeRaw) {
+            task.mode = modeEnum
+        }
+        task.speaker1AudioPath = row[speaker1AudioPath]
+        task.speaker2AudioPath = row[speaker2AudioPath]
+        task.speaker2OssUrl = row[speaker2OssUrl]
+        task.speaker2TingwuTaskId = row[speaker2TingwuTaskId]
+        task.speaker1Transcript = row[speaker1Transcript]
+        task.speaker2Transcript = row[speaker2Transcript]
+        task.alignedConversation = row[alignedConversation]
+        
+        if let s1StatusRaw = row[speaker1Status], let s1StatusEnum = MeetingTaskStatus(rawValue: s1StatusRaw) {
+            task.speaker1Status = s1StatusEnum
+        }
+        if let s2StatusRaw = row[speaker2Status], let s2StatusEnum = MeetingTaskStatus(rawValue: s2StatusRaw) {
+            task.speaker2Status = s2StatusEnum
+        }
+        
+        return task
     }
 }

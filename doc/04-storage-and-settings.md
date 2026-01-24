@@ -4,11 +4,20 @@
 
 Explain where data is stored, how settings and secrets are handled, and how logs work.
 
+## Storage Providers
+
+The app uses a `StorageProvider` abstraction with two implementations:
+
+- `SQLiteStorage`: local persistence (default)
+- `MySQLStorage`: remote persistence via `mysql-kit`
+
+Provider selection is driven by `SettingsStore.storageType` and wired by `StorageManager`.
+
 ## Persistence (SQLite)
 
 ### Database location
 
-`DatabaseManager` attempts to place the DB at:
+`SQLiteStorage` attempts to place the DB at:
 
 - Preferred: `~/Library/Application Support/VoiceMemo/db.sqlite3`
 - Fallback: `~/Documents/VoiceMemo/db.sqlite3`
@@ -74,10 +83,21 @@ Writes use `insert(or: .replace)` keyed by `id`.
 - `refresh()` re-fetches tasks ordered by `created_at` descending.
 - `deleteTask(at:)` deletes rows by UUID.
 
+## Persistence (MySQL)
+
+`MySQLStorage` uses the same logical schema as SQLite and creates the `meeting_tasks` table via `CREATE TABLE IF NOT EXISTS`.
+
+Connection details come from settings:
+
+- Host / Port / User / Database (UserDefaults)
+- Password (Keychain, see below)
+
 ## Settings (UserDefaults)
 
 `SettingsStore` persists non-secret configuration via UserDefaults:
 
+- Storage: `storageType` (`local` or `mysql`)
+- MySQL: host/port/user/database
 - OSS: region/bucket/prefix/endpoint
 - Tingwu: appKey, language
 - Feature toggles: summary/key points/action items/role split
@@ -93,6 +113,7 @@ Accounts used:
 
 - `aliyun_ak_id`
 - `aliyun_ak_secret`
+- `mysql_password`
 
 `SettingsStore` never exposes secrets in clear text to the UI; it only provides:
 

@@ -8,6 +8,9 @@ struct VoiceMemoApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(settings: settings)
+                .onAppear {
+                    StorageManager.shared.setup(settings: settings)
+                }
         }
     }
 }

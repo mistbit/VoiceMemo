@@ -9,7 +9,7 @@ class MeetingPipelineManager: ObservableObject {
     
     private let ossService: OSSService
     private let tingwuService: TingwuService
-    private let database: DatabaseManager
+    // private let database: DatabaseManager
     private let settings: SettingsStore
     
     init(task: MeetingTask, settings: SettingsStore) {
@@ -17,7 +17,7 @@ class MeetingPipelineManager: ObservableObject {
         self.settings = settings
         self.ossService = OSSService(settings: settings)
         self.tingwuService = TingwuService(settings: settings)
-        self.database = DatabaseManager.shared
+        // self.database = DatabaseManager.shared
     }
     
     // MARK: - Actions
@@ -590,7 +590,7 @@ class MeetingPipelineManager: ObservableObject {
     }
     
     private func save() {
-        database.saveTask(self.task)
+        Task { try? await StorageManager.shared.currentProvider.saveTask(self.task) }
     }
     
     func buildTranscriptText(from transcriptionData: [String: Any]) -> String? {

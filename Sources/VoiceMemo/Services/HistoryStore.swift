@@ -5,35 +5,48 @@ class HistoryStore: ObservableObject {
     @Published var tasks: [MeetingTask] = []
     
     init() {
-        refresh()
+        Task { await refresh() }
     }
     
-    func refresh() {
-        tasks = DatabaseManager.shared.fetchTasks()
+    @MainActor
+    func refresh() async {
+        do {
+            tasks = try await StorageManager.shared.currentProvider.fetchTasks()
+        } catch {
+            print("HistoryStore refresh error: \(error)")
+        }
     }
     
     func deleteTask(at offsets: IndexSet) {
-        for index in offsets {
-            let task = tasks[index]
-            DatabaseManager.shared.deleteTask(id: task.id)
+        let tasksToDelete = offsets.map { tasks[$0] }
+        Task {
+            for task in tasksToDelete {
+                try? await StorageManager.shared.currentProvider.deleteTask(id: task.id)
+            }
+            await refresh()
         }
-        refresh()
     }
 
     func deleteTask(_ task: MeetingTask) {
-        DatabaseManager.shared.deleteTask(id: task.id)
-        refresh()
+        Task {
+            try? await StorageManager.shared.currentProvider.deleteTask(id: task.id)
+            await refresh()
+        }
     }
 
     func deleteTasks(_ tasks: [MeetingTask]) {
-        for task in tasks {
-            DatabaseManager.shared.deleteTask(id: task.id)
+        Task {
+            for task in tasks {
+                try? await StorageManager.shared.currentProvider.deleteTask(id: task.id)
+            }
+            await refresh()
         }
-        refresh()
     }
 
     func updateTitle(for task: MeetingTask, newTitle: String) {
-        DatabaseManager.shared.updateTaskTitle(id: task.id, newTitle: newTitle)
-        refresh()
+        Task {
+            try? await StorageManager.shared.currentProvider.updateTaskTitle(id: task.id, newTitle: newTitle)
+            await refresh()
+        }
     }
 }

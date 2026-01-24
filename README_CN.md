@@ -12,6 +12,7 @@ English version: [README.md](README.md)
 - **原生性能**：采用 SwiftUI 和 ScreenCaptureKit 开发，性能卓越，CPU 占用率极低。
 - **隐私优先**：所有处理均在本地完成，具有清晰的权限管理机制。
 - **会议纪要（阿里云听悟 + OSS）**：手动触发流水线进行转写和结构化纪要生成（摘要 / 要点 / 待办），并支持导出 Markdown。
+- **存储（SQLite/MySQL）**：历史记录可保存到本地或 MySQL，并支持本地同步到 MySQL。
 
 ## 更新日志
 
@@ -40,10 +41,13 @@ flowchart LR
     B --> C
     C --> D["MeetingPipelineManager<br/>状态机流水线"]
     D -->|转码| E["AVAssetExportSession<br/>mixed_48k.m4a"]
-    D -->|持久化| J["DatabaseManager<br/>SQLite"]
+    D -->|持久化| SM["StorageManager<br/>StorageProvider"]
     D -->|配置| S["SettingsStore"]
     S --> K["KeychainHelper<br/>AK/SK"]
-    J --> V["SwiftUI 视图<br/>SettingsView / PipelineView / ResultView"]
+    SM -->|本地| J1["SQLiteStorage<br/>SQLite"]
+    SM -->|远程| J2["MySQLStorage<br/>mysql-kit"]
+    J1 --> V["SwiftUI 视图<br/>SettingsView / PipelineView / ResultView"]
+    J2 --> V
   end
 
   subgraph Cloud["阿里云"]
@@ -109,7 +113,8 @@ open VoiceMemo.app
 若要在 Xcode 中打开项目进行调试：
 
 ```bash
-xed .
+python3 generate_project.py
+xed VoiceMemo.xcodeproj
 ```
 
 请务必在 **Signing & Capabilities** 中配置您的开发团队（Team），以便应用能以完整权限运行。

@@ -54,7 +54,7 @@ struct ContentView: View {
         }
         .onChange(of: recorder.latestTask?.id) { _ in
             // Refresh history when a new task is created
-            historyStore.refresh()
+            Task { await historyStore.refresh() }
         }
         .frame(minWidth: 900, minHeight: 600)
     }

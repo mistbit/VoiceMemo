@@ -2,6 +2,32 @@ import Foundation
 import Combine
 
 class SettingsStore: ObservableObject {
+    // Storage Config
+    enum StorageType: String, CaseIterable, Identifiable {
+        case local
+        case mysql
+        var id: String { self.rawValue }
+    }
+    
+    @Published var storageType: StorageType {
+        didSet { UserDefaults.standard.set(storageType.rawValue, forKey: "storageType") }
+    }
+    
+    // MySQL Config
+    @Published var mysqlHost: String {
+        didSet { UserDefaults.standard.set(mysqlHost, forKey: "mysqlHost") }
+    }
+    @Published var mysqlPort: Int {
+        didSet { UserDefaults.standard.set(mysqlPort, forKey: "mysqlPort") }
+    }
+    @Published var mysqlUser: String {
+        didSet { UserDefaults.standard.set(mysqlUser, forKey: "mysqlUser") }
+    }
+    @Published var mysqlDatabase: String {
+        didSet { UserDefaults.standard.set(mysqlDatabase, forKey: "mysqlDatabase") }
+    }
+    @Published var hasMySQLPassword: Bool = false
+    
     // OSS Config
     @Published var ossRegion: String {
         didSet { UserDefaults.standard.set(ossRegion, forKey: "ossRegion") }
@@ -48,6 +74,14 @@ class SettingsStore: ObservableObject {
     private let logQueue = DispatchQueue(label: "cn.mistbit.voicememo.log")
     
     init() {
+        self.storageType = StorageType(rawValue: UserDefaults.standard.string(forKey: "storageType") ?? "local") ?? .local
+        
+        self.mysqlHost = UserDefaults.standard.string(forKey: "mysqlHost") ?? "localhost"
+        let port = UserDefaults.standard.integer(forKey: "mysqlPort")
+        self.mysqlPort = (port == 0) ? 3306 : port
+        self.mysqlUser = UserDefaults.standard.string(forKey: "mysqlUser") ?? "root"
+        self.mysqlDatabase = UserDefaults.standard.string(forKey: "mysqlDatabase") ?? "voicememo"
+        
         self.ossRegion = UserDefaults.standard.string(forKey: "ossRegion") ?? "cn-beijing"
         self.ossBucket = UserDefaults.standard.string(forKey: "ossBucket") ?? "wechat-record"
         self.ossPrefix = UserDefaults.standard.string(forKey: "ossPrefix") ?? "wvr/"
@@ -68,6 +102,16 @@ class SettingsStore: ObservableObject {
     func checkSecrets() {
         hasAccessKeyId = KeychainHelper.shared.readString(account: "aliyun_ak_id") != nil
         hasAccessKeySecret = KeychainHelper.shared.readString(account: "aliyun_ak_secret") != nil
+        hasMySQLPassword = KeychainHelper.shared.readString(account: "mysql_password") != nil
+    }
+    
+    func saveMySQLPassword(_ value: String) {
+        KeychainHelper.shared.save(value, account: "mysql_password")
+        checkSecrets()
+    }
+    
+    func getMySQLPassword() -> String? {
+        return KeychainHelper.shared.readString(account: "mysql_password")
     }
     
     func saveAccessKeyId(_ value: String) {

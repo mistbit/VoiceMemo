@@ -4,11 +4,20 @@
 
 说明数据存在哪里、配置和密钥如何管理、日志如何落盘，便于后续扩展与排障。
 
+## 存储实现（StorageProvider）
+
+应用通过 `StorageProvider` 抽象存储能力，目前有两种实现：
+
+- `SQLiteStorage`：本地存储（默认）
+- `MySQLStorage`：远程 MySQL 存储（基于 `mysql-kit`）
+
+具体使用哪一种由 `SettingsStore.storageType` 决定，并由 `StorageManager` 负责切换。
+
 ## 持久化（SQLite）
 
 ### 数据库路径
 
-`DatabaseManager` 会按优先级尝试：
+`SQLiteStorage` 会按优先级尝试：
 
 - 首选：`~/Library/Application Support/VoiceMemo/db.sqlite3`
 - 兜底：`~/Documents/VoiceMemo/db.sqlite3`
@@ -74,10 +83,21 @@
 - `refresh()`：按 `created_at` 倒序重新拉取
 - `deleteTask(at:)`：按 UUID 删除任务记录
 
+## 持久化（MySQL）
+
+`MySQLStorage` 与 SQLite 采用相同的逻辑字段集，并通过 `CREATE TABLE IF NOT EXISTS` 创建 `meeting_tasks` 表。
+
+连接信息来自设置项：
+
+- Host / Port / User / Database（UserDefaults）
+- Password（Keychain，见下文）
+
 ## 配置（UserDefaults）
 
 `SettingsStore` 通过 UserDefaults 保存非密钥配置：
 
+- 存储：`storageType`（`local` 或 `mysql`）
+- MySQL：host/port/user/database
 - OSS：region/bucket/prefix/endpoint
 - 听悟：appKey、language
 - 功能开关：summary/key points/action items/role split
@@ -93,6 +113,7 @@ accounts：
 
 - `aliyun_ak_id`
 - `aliyun_ak_secret`
+- `mysql_password`
 
 `SettingsStore` 不会在 UI 层暴露明文密钥，只提供：
 

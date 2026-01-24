@@ -98,7 +98,7 @@ struct HistoryView: View {
         .navigationTitle("Meetings")
         .toolbar {
             Button(action: {
-                store.refresh()
+                Task { await store.refresh() }
             }) {
                 Image(systemName: "arrow.clockwise")
             }
