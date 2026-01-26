@@ -427,7 +427,7 @@ struct SectionCard: View {
                     .foregroundColor(.primary)
             }
             
-            Text(content)
+            Text(markdownContent)
                 .font(.body)
                 .foregroundColor(.primary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -439,5 +439,13 @@ struct SectionCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
+    }
+    
+    private var markdownContent: AttributedString {
+        do {
+            return try AttributedString(markdown: content)
+        } catch {
+            return AttributedString(stringLiteral: content)
+        }
     }
 }
