@@ -12,6 +12,7 @@ struct HistoryView: View {
     @State private var taskToRename: MeetingTask?
     @State private var newTitle: String = ""
     @State private var isShowingRenameAlert = false
+    @State private var isShowingImportSheet = false
     
     var filteredTasks: [MeetingTask] {
         if searchText.isEmpty {
@@ -23,70 +24,16 @@ struct HistoryView: View {
     
     var body: some View {
         List(selection: $selectedTask) {
-            Section {
-                // New Recording Button Item
-                Button(action: {
-                    selectedTask = nil
-                    isRecordingMode = true
-                }) {
-                    HStack {
-                        Label("New Recording", systemImage: "mic.badge.plus")
-                            .font(.body)
-                            .foregroundColor(isRecordingMode ? .accentColor : .primary)
-                        Spacer()
-                    }
-                    .padding(.vertical, 4)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .listRowBackground(isRecordingMode ? Color.accentColor.opacity(0.15) : nil)
-                
-                // Import Audio Button Item
-                Button(action: {
-                    openImportPanel()
-                }) {
-                    HStack {
-                        Label("Import Audio", systemImage: "square.and.arrow.down")
-                            .font(.body)
-                            .foregroundColor(.primary)
-                        Spacer()
-                    }
-                    .padding(.vertical, 4)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-            
-            Section(header: Text("History").font(.subheadline).fontWeight(.semibold).foregroundColor(.secondary)) {
-                ForEach(filteredTasks) { task in
-                    NavigationLink(value: task) {
-                        HistoryRow(task: task)
-                    }
-                    .contextMenu {
-                        Button {
-                            taskToRename = task
-                            newTitle = task.title
-                            isShowingRenameAlert = true
-                        } label: {
-                            Label("Rename", systemImage: "pencil")
-                        }
-
-                        Divider()
-
-                        Button(role: .destructive) {
-                            pendingDeleteTask = task
-                            isShowingDeleteAlert = true
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-                }
-                .onDelete(perform: deleteItems)
-            }
+            sidebarContent
         }
         .listStyle(.sidebar)
         .searchable(text: $searchText, placement: .sidebar, prompt: "Search")
         .navigationTitle("Voice Memo")
+        .sheet(isPresented: $isShowingImportSheet) {
+            ImportSheet { mode, files in
+                handleImport(mode: mode, files: files)
+            }
+        }
         .toolbar {
             Button(action: {
                 Task { await store.refresh() }
@@ -133,28 +80,81 @@ struct HistoryView: View {
         }
     }
     
-    private func openImportPanel() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [UTType.audio]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.prompt = "Import"
-        panel.message = "Select an audio file to import"
+    @ViewBuilder
+    private var sidebarContent: some View {
+        Section {
+            // New Recording Button Item
+            Button(action: {
+                selectedTask = nil
+                isRecordingMode = true
+            }) {
+                HStack {
+                    Label("New Recording", systemImage: "mic.badge.plus")
+                        .font(.body)
+                        .foregroundColor(isRecordingMode ? .accentColor : .primary)
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .listRowBackground(isRecordingMode ? Color.accentColor.opacity(0.15) : nil)
+            
+            // Import Audio Button Item
+            Button(action: {
+                isShowingImportSheet = true
+            }) {
+                HStack {
+                    Label("Import Audio", systemImage: "square.and.arrow.down")
+                        .font(.body)
+                        .foregroundColor(.primary)
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
         
-        panel.begin { response in
-            if response == .OK, let url = panel.url {
-                Task {
-                    do {
-                        let newTask = try await store.importAudio(from: url)
-                        await MainActor.run {
-                            self.selectedTask = newTask
-                            self.isRecordingMode = false
-                        }
-                    } catch {
-                        print("Import failed: \(error)")
+        Section(header: Text("History").font(.subheadline).fontWeight(.semibold).foregroundColor(.secondary)) {
+            ForEach(filteredTasks) { task in
+                NavigationLink(value: task) {
+                    HistoryRow(task: task)
+                }
+                .contextMenu {
+                    Button {
+                        taskToRename = task
+                        newTitle = task.title
+                        isShowingRenameAlert = true
+                    } label: {
+                        Label("Rename", systemImage: "pencil")
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        pendingDeleteTask = task
+                        isShowingDeleteAlert = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
                     }
                 }
+            }
+            .onDelete(perform: deleteItems)
+        }
+    }
+    
+    private func handleImport(mode: MeetingMode, files: [URL]) {
+        Task {
+            do {
+                let newTask = try await store.importTask(mode: mode, files: files)
+                await MainActor.run {
+                    self.selectedTask = newTask
+                    self.isRecordingMode = false
+                }
+            } catch {
+                print("Import failed: \(error)")
+                // Optionally show error alert
             }
         }
     }
