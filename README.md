@@ -116,6 +116,10 @@ After a recording completes, the latest task appears in the pipeline UI. Trigger
 - Transcode → Upload → Create Task → Refresh Status
 - View Result → Export Markdown
 
+### 6. Import audio (optional)
+
+Use the sidebar action **Import Audio** to create a meeting task from an existing audio file, then run the same pipeline steps as above.
+
 ## Development
 
 To open the project in Xcode for debugging:

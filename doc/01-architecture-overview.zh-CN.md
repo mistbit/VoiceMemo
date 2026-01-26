@@ -62,10 +62,9 @@ flowchart TD
   I1 --> J1[MeetingPipelineManager]
   
   G1 -->|分离模式| I2[创建 MeetingTask]
-  I2 --> J2[SeparatedMeetingPipelineManager]
+  I2 --> J1
   
   J1 --> K[转码/上传/听悟/轮询]
-  J2 --> K
   
   K --> O[保存转写/总结/对齐结果]
   O --> P[ResultView 导出 Markdown]

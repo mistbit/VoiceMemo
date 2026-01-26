@@ -62,10 +62,9 @@ flowchart TD
   I1 --> J1[MeetingPipelineManager]
   
   G1 -->|Separated Mode| I2[Create MeetingTask]
-  I2 --> J2[SeparatedMeetingPipelineManager]
+  I2 --> J1
   
   J1 --> K[Transcode/Upload/Tingwu/Poll]
-  J2 --> K
   
   K --> O[Persist transcript/summary/aligned results]
   O --> P[ResultView export Markdown]
