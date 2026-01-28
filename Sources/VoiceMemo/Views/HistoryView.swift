@@ -35,11 +35,6 @@ struct HistoryView: View {
             }
         }
         .toolbar {
-            Button(action: {
-                Task { await store.refresh() }
-            }) {
-                Image(systemName: "arrow.clockwise")
-            }
             if let selectedTask {
                 Button(role: .destructive) {
                     pendingDeleteTask = selectedTask
