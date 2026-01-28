@@ -80,12 +80,33 @@ struct SettingsView: View {
         }
     }
     
+    private struct ToggleRow: View {
+        let icon: String
+        let title: String
+        @Binding var isOn: Bool
+        
+        var body: some View {
+            HStack {
+                Image(systemName: icon)
+                    .frame(width: 20)
+                    .foregroundColor(.blue)
+                Text(title)
+                Spacer()
+                Toggle("", isOn: $isOn)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+        }
+    }
+    
     // MARK: - Forms
     
     private var generalForm: some View {
         VStack(spacing: 20) {
             GroupBox(label: Text("Audio & Features").bold()) {
-                VStack(spacing: 12) {
+                VStack(spacing: 16) {
                     FormRow(label: "Language") {
                         Picker("", selection: $settings.language) {
                             Text("Chinese (cn)").tag("cn")
@@ -97,36 +118,39 @@ struct SettingsView: View {
                     
                     Divider()
                     
-                    FormRow(label: "Summary") {
-                        Toggle("Enable Summary", isOn: $settings.enableSummary)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                    }
-                    
-                    FormRow(label: "Key Points") {
-                        Toggle("Enable Key Points", isOn: $settings.enableKeyPoints)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                    }
-                    
-                    FormRow(label: "Action Items") {
-                        Toggle("Enable Action Items", isOn: $settings.enableActionItems)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                    }
-                    
                     FormRow(label: "Role Split") {
                         Toggle("Enable Role Split", isOn: $settings.enableRoleSplit)
                             .toggleStyle(.switch)
                             .labelsHidden()
+                        Text("Distinguish speakers in audio")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 8)
                     }
                     
                     Divider()
                     
-                    FormRow(label: "Verbose Logging") {
-                        Toggle("Enable Verbose Logging", isOn: $settings.enableVerboseLogging)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
+                    // AI Features Group
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("AI Analysis")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 120) // Align with form content
+                        
+                        VStack(spacing: 0) {
+                            ToggleRow(icon: "doc.text", title: "Summary", isOn: $settings.enableSummary)
+                            Divider().padding(.leading, 44)
+                            ToggleRow(icon: "list.bullet.rectangle", title: "Key Points", isOn: $settings.enableKeyPoints)
+                            Divider().padding(.leading, 44)
+                            ToggleRow(icon: "checkmark.square", title: "Action Items", isOn: $settings.enableActionItems)
+                        }
+                        .background(Color(nsColor: .controlBackgroundColor))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                        )
+                        .padding(.leading, 120) // Align with form content
                     }
                 }
                 .padding(8)
@@ -134,6 +158,18 @@ struct SettingsView: View {
             
             GroupBox(label: Text("Logs").bold()) {
                 VStack(spacing: 12) {
+                    FormRow(label: "Settings") {
+                        Toggle("Verbose Logging", isOn: $settings.enableVerboseLogging)
+                            .toggleStyle(.switch)
+                            .labelsHidden()
+                        Text("Enable detailed debug logs")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 8)
+                    }
+                    
+                    Divider()
+                    
                     FormRow(label: "Path") {
                         Text(settings.logFileURL().path)
                             .font(.caption)
