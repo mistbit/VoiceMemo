@@ -8,7 +8,7 @@ struct ContentView: View {
     
     @State private var selectedTask: MeetingTask?
     @State private var isRecordingMode = true
-    @State private var isShowingSettings = false
+    @State private var isSettingsMode = false
     
     init(settings: SettingsStore) {
         self.settings = settings
@@ -17,9 +17,11 @@ struct ContentView: View {
     
     var body: some View {
         NavigationSplitView {
-            HistoryView(store: historyStore, selectedTask: $selectedTask, isRecordingMode: $isRecordingMode)
+            HistoryView(store: historyStore, selectedTask: $selectedTask, isRecordingMode: $isRecordingMode, isSettingsMode: $isSettingsMode)
         } detail: {
-            if isRecordingMode {
+            if isSettingsMode {
+                SettingsView(settings: settings)
+            } else if isRecordingMode {
                 RecordingView(recorder: recorder, settings: settings)
             } else if let task = selectedTask {
                 ResultView(task: task, settings: settings)
@@ -29,27 +31,22 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button(action: {
-                    isShowingSettings = true
-                }) {
-                    Image(systemName: "gear")
-                }
-                .disabled(recorder.isRecording)
-            }
-        }
-        .sheet(isPresented: $isShowingSettings) {
-            SettingsView(settings: settings)
-        }
         .onChange(of: selectedTask) { newTask in
             if newTask != nil {
                 isRecordingMode = false
+                isSettingsMode = false
             }
         }
         .onChange(of: isRecordingMode) { newValue in
             if newValue {
                 selectedTask = nil
+                isSettingsMode = false
+            }
+        }
+        .onChange(of: isSettingsMode) { newValue in
+            if newValue {
+                selectedTask = nil
+                isRecordingMode = false
             }
         }
         .onChange(of: recorder.latestTask?.id) { _ in
