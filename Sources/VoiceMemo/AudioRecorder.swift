@@ -21,6 +21,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     
     private var settings: SettingsStore
     private var recordingId: String?
+    private var recordingStartTime: Date?
     
     // System Audio (Remote)
     private var stream: SCStream?
@@ -93,6 +94,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     private func beginRecordingSession(app: SCRunningApplication) {
         isFirstRemoteBuffer = true
         isFirstMicBuffer = true
+        self.recordingStartTime = Date()
         
         // Generate URLs
         let formatter = DateFormatter()
@@ -339,7 +341,10 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                             self.statusMessage = "Saved 3 files to Downloads/VoiceMemoRecordings"
                             
                             // Create Meeting Task
-                            let title = "Meeting \(recId)"
+                            let formatter = DateFormatter()
+                            formatter.dateFormat = "MM-dd HH:mm"
+                            let dateStr = formatter.string(from: self.recordingStartTime ?? Date())
+                            let title = "Rec \(dateStr)"
                             let task = MeetingTask(recordingId: recId, localFilePath: mixedURL.path, title: title)
                             Task { try? await StorageManager.shared.currentProvider.saveTask(task) }
                             self.latestTask = task
@@ -359,7 +364,10 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                         self.isRecording = false
                         self.statusMessage = "Saved 2 files (Separated) to Downloads/VoiceMemoRecordings"
                         
-                        let title = "Meeting \(recId) (Separated)"
+                        let formatter = DateFormatter()
+                        formatter.dateFormat = "MM-dd HH:mm"
+                        let dateStr = formatter.string(from: self.recordingStartTime ?? Date())
+                        let title = "Rec \(dateStr) (Sep)"
                         // Use Mic (Local) as primary display file
                         var task = MeetingTask(recordingId: recId, localFilePath: lURL.path, title: title)
                         task.mode = .separated
