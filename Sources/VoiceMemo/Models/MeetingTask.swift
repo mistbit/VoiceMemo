@@ -2,8 +2,8 @@ import Foundation
 
 enum MeetingTaskStatus: String, Codable, CaseIterable, Hashable {
     case recorded      // 录音完成
-    case uploadingRaw  // 上传原始文件中 (was uploadingOriginal)
-    case uploadedRaw   // 原始文件上传完成 (was uploadedOriginal)
+    case uploadingRaw  // 上传原始文件中
+    case uploadedRaw   // 原始文件上传完成
     case transcoding   // 转码中
     case transcoded    // 转码完成
     case uploading     // 上传中
@@ -12,15 +12,13 @@ enum MeetingTaskStatus: String, Codable, CaseIterable, Hashable {
     case polling       // 轮询中
     case completed     // 完成
     case failed        // 失败
-    
-    // Custom decoding to handle legacy values
+
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let rawValue = try container.decode(String.self)
         if let status = MeetingTaskStatus(rawValue: rawValue) {
             self = status
         } else {
-            // Backward compatibility
             switch rawValue {
             case "uploadingOriginal": self = .uploadingRaw
             case "uploadedOriginal": self = .uploadedRaw
@@ -29,17 +27,36 @@ enum MeetingTaskStatus: String, Codable, CaseIterable, Hashable {
             }
         }
     }
-    
-    // Helper for database reading compatibility
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
     static func from(rawValue: String) -> MeetingTaskStatus? {
         if let status = MeetingTaskStatus(rawValue: rawValue) {
             return status
         }
-        // Backward compatibility
         switch rawValue {
         case "uploadingOriginal": return .uploadingRaw
         case "uploadedOriginal": return .uploadedRaw
         default: return nil
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .recorded: return "Recorded"
+        case .uploadingRaw: return "Up Raw"
+        case .uploadedRaw: return "Raw Up"
+        case .transcoding: return "Transcode"
+        case .transcoded: return "Transcoded"
+        case .uploading: return "Uploading"
+        case .uploaded: return "Uploaded"
+        case .created: return "Created"
+        case .polling: return "Polling"
+        case .completed: return "Done"
+        case .failed: return "Failed"
         }
     }
 }

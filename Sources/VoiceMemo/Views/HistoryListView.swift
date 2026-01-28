@@ -143,7 +143,7 @@ struct StatusBadge: View {
                 .fill(color)
                 .frame(width: 6, height: 6)
             
-            Text(status.rawValue.capitalized)
+            Text(status.displayName)
                 .font(.caption2)
                 .fontWeight(.medium)
                 .foregroundColor(.primary.opacity(0.8))

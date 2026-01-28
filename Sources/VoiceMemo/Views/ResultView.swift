@@ -292,7 +292,7 @@ struct ConversationView: View {
                     Text("Speaker 1 (Local)")
                         .font(.headline)
                     if let s = task.speaker1Status {
-                        Text("(\(s.rawValue))").font(.caption).foregroundColor(.secondary)
+                        Text("(\(s.displayName))").font(.caption).foregroundColor(.secondary)
                     }
                     Spacer()
                 }
@@ -312,7 +312,7 @@ struct ConversationView: View {
                     Text("Speaker 2 (Remote)")
                         .font(.headline)
                     if let s = task.speaker2Status {
-                        Text("(\(s.rawValue))").font(.caption).foregroundColor(.secondary)
+                        Text("(\(s.displayName))").font(.caption).foregroundColor(.secondary)
                     }
                     Spacer()
                 }

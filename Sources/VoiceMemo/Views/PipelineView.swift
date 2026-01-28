@@ -229,11 +229,11 @@ struct PipelineView: View {
             VStack {
                 if manager.task.mode == .mixed {
                     if let failedStep = manager.task.failedStep {
-                        Text("Failed at: \(failedStep.rawValue.capitalized)")
+                        Text("Failed at: \(failedStep.displayName)")
                             .foregroundColor(.red)
                             .font(.caption)
                         
-                        Button("Retry \(failedStep.rawValue.capitalized)") {
+                        Button("Retry \(failedStep.displayName)") {
                             Task { await manager.retry() }
                         }
                         .buttonStyle(.borderedProminent)
@@ -350,13 +350,13 @@ struct SpeakerStatusItem: View {
     
     var displayStatus: String {
         if let status = status {
-            return status.rawValue.capitalized
+            return status.displayName
         }
         // Fallback to global status if individual status is not yet tracked (e.g. pre-polling)
         if globalStatus == .polling {
             return "Pending..."
         }
-        return globalStatus.rawValue.capitalized
+        return globalStatus.displayName
     }
     
     var statusColor: Color {
@@ -401,7 +401,7 @@ struct SpeakerStatusItem: View {
             }
             
             if let step = failedStep {
-                Text("Failed at: \(step.rawValue)")
+                Text("Failed at: \(step.displayName)")
                     .font(.caption2)
                     .foregroundColor(.red)
             }
