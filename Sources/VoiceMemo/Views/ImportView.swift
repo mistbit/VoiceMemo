@@ -11,67 +11,91 @@ struct ImportView: View {
     var onImport: (MeetingMode, [URL]) -> Void
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Import Audio")
-                .font(.largeTitle)
-                .padding()
-            
-            Form {
-                Section(header: Text("Configuration")) {
-                    Picker("Mode", selection: $selectedMode) {
-                        Text("Mixed Mode (Single File)").tag(MeetingMode.mixed)
-                        Text("Separated Mode (Dual Files)").tag(MeetingMode.separated)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Configuration Card
+                GroupBox(label: Text("Configuration").bold()) {
+                    VStack(spacing: 12) {
+                        FormRow(label: "Mode") {
+                            Picker("", selection: $selectedMode) {
+                                Text("Mixed Mode (Single File)").tag(MeetingMode.mixed)
+                                Text("Separated Mode (Dual Files)").tag(MeetingMode.separated)
+                            }
+                            .labelsHidden()
+                            .frame(maxWidth: 240)
+                        }
+                        
+                        Divider()
+                        
+                        FormRow(label: "Description") {
+                            Text(modeDescription)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
-                    .pickerStyle(.segmented)
-                    
-                    if selectedMode == .mixed {
-                        Text("Mixed mode uses a single audio file for the entire meeting.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("Separated mode requires two files: one for Speaker 1 (Local) and one for Speaker 2 (Remote).")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    .padding(8)
                 }
                 
-                Section(header: Text("Files")) {
-                    if selectedMode == .mixed {
-                        FilePickerRow(title: "Audio File", url: $file1URL)
-                    } else {
-                        FilePickerRow(title: "Speaker 1 (Local)", url: $file1URL)
-                        FilePickerRow(title: "Speaker 2 (Remote)", url: $file2URL)
+                // Files Card
+                GroupBox(label: Text("Files").bold()) {
+                    VStack(spacing: 12) {
+                        if selectedMode == .mixed {
+                            FilePickerRow(title: "Audio File", url: $file1URL)
+                        } else {
+                            FilePickerRow(title: "Local (Speaker 1)", url: $file1URL)
+                            FilePickerRow(title: "Remote (Speaker 2)", url: $file2URL)
+                        }
                     }
+                    .padding(8)
                 }
                 
+                // Error Message
                 if let error = errorMessage {
-                    Section {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
                         Text(error)
                             .foregroundColor(.red)
-                            .font(.caption)
+                            .font(.callout)
                     }
+                    .padding()
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
                 }
+                
+                // Action Button
+                HStack {
+                    Spacer()
+                    Button(action: doImport) {
+                        if isImporting {
+                            ProgressView()
+                                .controlSize(.small)
+                                .padding(.horizontal, 8)
+                        } else {
+                            Text("Start Import")
+                                .padding(.horizontal, 8)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(!canImport || isImporting)
+                }
+                .padding(.top, 10)
             }
-            .formStyle(.grouped)
+            .padding()
             .frame(maxWidth: 600)
-            
-            Button(action: doImport) {
-                if isImporting {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Text("Start Import")
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(!canImport || isImporting)
-            .frame(maxWidth: 300)
-            
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding()
+    }
+    
+    private var modeDescription: String {
+        switch selectedMode {
+        case .mixed:
+            return "Mixed mode uses a single audio file containing all speakers. Suitable for standard recordings."
+        case .separated:
+            return "Separated mode requires two files: one for the local speaker (Mic) and one for the remote speaker (System Audio)."
+        }
     }
     
     private var canImport: Bool {
@@ -94,7 +118,17 @@ struct ImportView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             onImport(selectedMode, files)
             isImporting = false
-            // Reset fields? Maybe not, user might want to import another.
+        }
+    }
+    
+    // MARK: - Helper Views
+    
+    private func FormRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .frame(width: 120, alignment: .trailing)
+                .foregroundColor(.secondary)
+            content()
         }
     }
 }
@@ -104,31 +138,46 @@ struct FilePickerRow: View {
     @Binding var url: URL?
     
     var body: some View {
-        HStack {
+        HStack(alignment: .firstTextBaseline) {
             Text(title)
-                .frame(width: 120, alignment: .leading)
+                .frame(width: 120, alignment: .trailing)
+                .foregroundColor(.secondary)
             
-            if let url = url {
-                HStack {
+            HStack {
+                if let url = url {
                     Image(systemName: "doc.audio")
+                        .foregroundColor(.blue)
                     Text(url.lastPathComponent)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                        .foregroundColor(.primary)
+                } else {
+                    Text("No file selected")
+                        .foregroundColor(.secondary)
+                        .italic()
                 }
-                .help(url.path)
-            } else {
-                Text("No file selected")
-                    .foregroundColor(.secondary)
-                    .italic()
+                
+                Spacer()
+                
+                if url != nil {
+                    Button(action: { self.url = nil }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear selection")
+                }
+                
+                Button("Select...") {
+                    selectFile()
+                }
             }
-            
-            Spacer()
-            
-            Button("Select...") {
-                selectFile()
-            }
+            .padding(6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+            )
         }
-        .padding(.vertical, 4)
     }
     
     private func selectFile() {

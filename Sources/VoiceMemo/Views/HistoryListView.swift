@@ -93,24 +93,34 @@ struct HistoryRow: View {
     let task: MeetingTask
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(task.title)
                     .font(.headline)
                     .lineLimit(1)
                     .foregroundColor(.primary)
                 Spacer()
+                if task.status == .completed {
+                    Text(task.createdAt, style: .date)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             
             HStack {
-                Text(task.createdAt, style: .date)
-                Spacer()
+                if task.status != .completed {
+                     Text(task.createdAt, style: .date)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
                 StatusBadge(status: task.status)
+                if task.status == .completed {
+                    Spacer()
+                }
             }
-            .font(.caption)
-            .foregroundColor(.secondary)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 }
 
@@ -128,12 +138,19 @@ struct StatusBadge: View {
     }
     
     var body: some View {
-        Text(status.rawValue.capitalized)
-            .font(.system(size: 10, weight: .medium))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(color.opacity(0.15))
-            .foregroundColor(color)
-            .clipShape(Capsule())
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+            
+            Text(status.rawValue.capitalized)
+                .font(.caption2)
+                .fontWeight(.medium)
+                .foregroundColor(.primary.opacity(0.8))
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(color.opacity(0.1))
+        .cornerRadius(4)
     }
 }
