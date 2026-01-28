@@ -17,7 +17,7 @@ struct ContentView: View {
     
     var body: some View {
         NavigationSplitView {
-            HistoryView(store: historyStore, selectedTask: $selectedTask, isRecordingMode: $isRecordingMode)
+            HistoryView(store: historyStore, selectedTask: $selectedTask, isRecordingMode: $isRecordingMode, isSettingsMode: $isSettingsMode)
         } detail: {
             if isSettingsMode {
                 SettingsView(settings: settings)
@@ -31,18 +31,6 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Button(action: {
-                    isSettingsMode = true
-                    isRecordingMode = false
-                    selectedTask = nil
-                }) {
-                    Image(systemName: "gear")
-                }
-                .disabled(recorder.isRecording)
-            }
-        }
         .onChange(of: selectedTask) { newTask in
             if newTask != nil {
                 isRecordingMode = false
@@ -53,6 +41,12 @@ struct ContentView: View {
             if newValue {
                 selectedTask = nil
                 isSettingsMode = false
+            }
+        }
+        .onChange(of: isSettingsMode) { newValue in
+            if newValue {
+                selectedTask = nil
+                isRecordingMode = false
             }
         }
         .onChange(of: recorder.latestTask?.id) { _ in

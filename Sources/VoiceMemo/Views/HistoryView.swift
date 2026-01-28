@@ -5,6 +5,7 @@ struct HistoryView: View {
     @ObservedObject var store: HistoryStore
     @Binding var selectedTask: MeetingTask?
     @Binding var isRecordingMode: Bool
+    @Binding var isSettingsMode: Bool
     
     @State private var searchText = ""
     @State private var pendingDeleteTask: MeetingTask?
@@ -109,6 +110,24 @@ struct HistoryView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            
+            // Settings Button Item
+            Button(action: {
+                isSettingsMode = true
+                isRecordingMode = false
+                selectedTask = nil
+            }) {
+                HStack {
+                    Label("Settings", systemImage: "gear")
+                        .font(.body)
+                        .foregroundColor(isSettingsMode ? .accentColor : .primary)
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .listRowBackground(isSettingsMode ? Color.accentColor.opacity(0.15) : nil)
         }
         
         Section(header: Text("History").font(.subheadline).fontWeight(.semibold).foregroundColor(.secondary)) {
