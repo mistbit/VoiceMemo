@@ -103,6 +103,7 @@ Connection details come from settings:
 - MySQL: host/port/user/database
 - OSS: region/bucket/prefix/endpoint
 - Tingwu: appKey, language
+- Appearance: `appTheme` (`system`, `light`, `dark`)
 - Feature toggles: summary/key points/action items/role split
 - Logging: verbose logging flag
 

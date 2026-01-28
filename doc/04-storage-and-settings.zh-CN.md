@@ -103,6 +103,7 @@
 - MySQL：host/port/user/database
 - OSS：region/bucket/prefix/endpoint
 - 听悟：appKey、language
+- 外观：`appTheme`（`system` / `light` / `dark`）
 - 功能开关：summary/key points/action items/role split
 - 日志：verbose 开关
 

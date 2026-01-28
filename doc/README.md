@@ -13,4 +13,5 @@
 - 05-permissions-and-signing.md
 - 06-testing.md
 - 07-dual-speaker-separate-pipeline.zh-CN.md (Chinese only)
-
+- 08-import-guide.md
+- 09-security-and-audit.md

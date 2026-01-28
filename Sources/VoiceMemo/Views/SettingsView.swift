@@ -155,6 +155,25 @@ struct SettingsView: View {
                 }
                 .padding(8)
             }
+
+            GroupBox(label: Text("Appearance").bold()) {
+                VStack(spacing: 12) {
+                    FormRow(label: "Theme") {
+                        Picker("", selection: $settings.appTheme) {
+                            Text("Auto").tag(SettingsStore.AppTheme.system)
+                            Text("Light").tag(SettingsStore.AppTheme.light)
+                            Text("Dark").tag(SettingsStore.AppTheme.dark)
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 240)
+                        
+                        Spacer()
+                    }
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
             
             GroupBox(label: Text("Logs").bold()) {
                 VStack(spacing: 12) {

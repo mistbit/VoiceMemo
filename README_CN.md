@@ -10,6 +10,7 @@ English version: [README.md](README.md)
 - **自动合成**：录音结束后，智能地将两个轨道合并为一个高质量的混音文件。
 - **智能应用检测**：自动过滤并优先识别微信应用，实现无缝捕获。
 - **原生性能**：采用 SwiftUI 和 ScreenCaptureKit 开发，性能卓越，CPU 占用率极低。
+- **主题模式**：设置中支持 自动（跟随系统）/ 浅色 / 深色 三种外观模式。
 - **隐私优先**：所有处理均在本地完成，具有清晰的权限管理机制。
 - **会议纪要（阿里云听悟 + OSS）**：手动触发流水线进行转写和结构化纪要生成（摘要 / 要点 / 待办），并支持导出 Markdown。
 - **存储（SQLite/MySQL）**：历史记录可保存到本地或 MySQL，并支持本地同步到 MySQL。
@@ -17,6 +18,10 @@ English version: [README.md](README.md)
 ## 更新日志
 
 请参阅 [CHANGELOG.md](CHANGELOG.md) 查看完整的发布历史。
+
+## 安全与审计
+
+请参阅：[安全与审计说明](doc/09-security-and-audit.zh-CN.md)。
 
 ## 识别模式
 
@@ -94,6 +99,7 @@ open VoiceMemo.app
 ### 3. 配置听悟 + OSS（可选）
 
 在应用内打开 Settings 并配置：
+- 主题模式：自动（跟随系统）/ 浅色 / 深色
 - 阿里云 AccessKeyId / AccessKeySecret（保存到 Keychain）
 - 听悟 AppKey
 - OSS bucket / region / prefix

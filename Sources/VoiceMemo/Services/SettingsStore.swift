@@ -8,9 +8,20 @@ class SettingsStore: ObservableObject {
         case mysql
         var id: String { self.rawValue }
     }
+
+    enum AppTheme: String, CaseIterable, Identifiable {
+        case system
+        case light
+        case dark
+        var id: String { self.rawValue }
+    }
     
     @Published var storageType: StorageType {
         didSet { UserDefaults.standard.set(storageType.rawValue, forKey: "storageType") }
+    }
+
+    @Published var appTheme: AppTheme {
+        didSet { UserDefaults.standard.set(appTheme.rawValue, forKey: "appTheme") }
     }
     
     // MySQL Config
@@ -75,6 +86,7 @@ class SettingsStore: ObservableObject {
     
     init() {
         self.storageType = StorageType(rawValue: UserDefaults.standard.string(forKey: "storageType") ?? "local") ?? .local
+        self.appTheme = AppTheme(rawValue: UserDefaults.standard.string(forKey: "appTheme") ?? "system") ?? .system
         
         self.mysqlHost = UserDefaults.standard.string(forKey: "mysqlHost") ?? "localhost"
         let port = UserDefaults.standard.integer(forKey: "mysqlPort")

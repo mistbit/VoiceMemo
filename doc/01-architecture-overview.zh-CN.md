@@ -17,7 +17,7 @@
   - `AudioRecorder.swift`：双轨录音与本地合成（支持混合与分离两种模式）。
   - `Models/MeetingTask.swift`：任务模型与状态机。
   - `Services/`
-    - `SettingsStore.swift`：配置、功能开关、日志。
+    - `SettingsStore.swift`：配置、主题、功能开关、日志。
     - `KeychainHelper.swift`：Keychain 密钥存储（RAM AK/Secret）。
     - `OSSService.swift`：上传音频到 OSS。
     - `TingwuService.swift`：创建听悟离线任务 + 查询任务信息。
@@ -95,3 +95,14 @@ flowchart TD
 - `mysql-kit`：可选的 MySQL 持久化。
 - `alibabacloud-oss-swift-sdk-v2`：OSS 上传。
 - `CryptoKit`：听悟请求签名（ACS3-HMAC-SHA256）。
+
+## 安全
+
+关于数据收集、存储、网络流出和密钥处理的安全考虑，请参阅：`doc/09-security-and-audit.zh-CN.md`。
+
+关键安全方面：
+
+- 密钥（阿里云 AK/SK、MySQL 密码）存储在 Keychain 中，而非 UserDefaults。
+- 音频数据和会议内容在本地持久化，并可选择上传到 OSS。
+- 系统音频采集需要屏幕录制权限。
+- 网络流量包括 OSS 上传和听悟 API 调用。

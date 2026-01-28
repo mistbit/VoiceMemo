@@ -17,7 +17,7 @@ This document explains how the app is structured end-to-end: UI, recording, pipe
   - `AudioRecorder.swift`: dual-track audio capture and local merge (supports both mixed and separated modes).
   - `Models/MeetingTask.swift`: persisted task model and status state machine.
   - `Services/`
-    - `SettingsStore.swift`: user configuration, feature toggles, logging.
+    - `SettingsStore.swift`: user configuration, theme, feature toggles, logging.
     - `KeychainHelper.swift`: secret storage (RAM AK/Secret) in Keychain.
     - `OSSService.swift`: upload audio to OSS.
     - `TingwuService.swift`: create Tingwu offline task + poll task info.
@@ -95,3 +95,14 @@ Declared in `Package.swift`:
 - `mysql-kit`: optional MySQL persistence.
 - `alibabacloud-oss-swift-sdk-v2`: OSS uploads.
 - `CryptoKit`: Tingwu request signing (ACS3-HMAC-SHA256).
+
+## Security
+
+Security considerations for data collection, storage, network egress, and secrets handling are documented in: `doc/09-security-and-audit.md`.
+
+Key security aspects:
+
+- Secrets (Alibaba Cloud AK/SK, MySQL password) are stored in Keychain, not UserDefaults.
+- Audio data and meeting content are persisted locally and optionally uploaded to OSS.
+- Screen Recording permission is required for system audio capture.
+- Network traffic includes OSS uploads and Tingwu API calls.

@@ -10,6 +10,7 @@ Read this in Chinese: [README_CN.md](README_CN.md)
 - **Automatic Merging**: Intelligently mixes both tracks into a single high-quality audio file post-recording.
 - **Intelligent App Detection**: Automatically filters and prioritizes WeChat for seamless capture.
 - **Native Performance**: Built with SwiftUI and ScreenCaptureKit for optimal performance and low CPU overhead.
+- **Theme Mode**: System (Auto) / Light / Dark appearance selection in Settings.
 - **Privacy-First**: Operates locally on your machine with clear permission handling.
 - **Meeting Minutes (Alibaba Cloud Tingwu + OSS)**: Manual pipeline to transcribe audio and generate structured minutes (summary, key points, action items), with Markdown export.
 - **Storage Backends (SQLite/MySQL)**: Store history locally or in MySQL, with optional local-to-MySQL sync.
@@ -17,6 +18,10 @@ Read this in Chinese: [README_CN.md](README_CN.md)
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for full release history.
+
+## Security and Audit
+
+See [Security and Audit Notes](doc/09-security-and-audit.md).
 
 ## Recognition Modes
 
@@ -94,6 +99,7 @@ Please grant these permissions in **System Settings > Privacy & Security**.
 ### 3. Configure Tingwu + OSS (optional)
 
 Open Settings in the app and configure:
+- Theme: System (Auto) / Light / Dark
 - Alibaba Cloud AccessKeyId / AccessKeySecret (stored in Keychain)
 - Tingwu AppKey
 - OSS bucket / region / prefix
