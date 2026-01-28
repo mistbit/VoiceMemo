@@ -5,6 +5,7 @@ struct ResultView: View {
     let task: MeetingTask
     let settings: SettingsStore
     @State private var selectedTab: ResultTab = .overview
+    @Namespace private var animationNamespace
     
     enum ResultTab: String, CaseIterable, Identifiable {
         case overview = "Overview"
@@ -28,33 +29,63 @@ struct ResultView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(task.title)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    Text(task.createdAt, style: .date)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 16) {
+                // Top Row: Title & Actions
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(task.title)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        Text(task.createdAt, style: .date)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: exportMarkdown) {
+                        Label("Export", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
                 
-                Spacer()
-                
-                Picker("View", selection: $selectedTab) {
+                // Bottom Row: Custom Tabs
+                HStack(spacing: 24) {
                     ForEach(ResultTab.allCases) { tab in
-                        Text(tab.rawValue).tag(tab)
+                        Button {
+                            withAnimation(.snappy) {
+                                selectedTab = tab
+                            }
+                        } label: {
+                            VStack(spacing: 6) {
+                                Text(tab.rawValue)
+                                    .font(.system(size: 14))
+                                    .fontWeight(selectedTab == tab ? .medium : .regular)
+                                    .foregroundColor(selectedTab == tab ? .primary : .secondary)
+                                
+                                // Active Indicator
+                                ZStack {
+                                    Rectangle()
+                                        .fill(Color.clear)
+                                        .frame(height: 2)
+                                    if selectedTab == tab {
+                                        Rectangle()
+                                            .fill(Color.accentColor)
+                                            .frame(height: 2)
+                                            .matchedGeometryEffect(id: "TabIndicator", in: animationNamespace)
+                                    }
+                                }
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 300)
-                
-                Spacer()
-                
-                Button(action: exportMarkdown) {
-                    Label("Export", systemImage: "square.and.arrow.up")
-                }
             }
-            .padding()
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+            .padding(.bottom, 0)
             .background(Color(nsColor: .controlBackgroundColor))
             .overlay(Divider(), alignment: .bottom)
             
