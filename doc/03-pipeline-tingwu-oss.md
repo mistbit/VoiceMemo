@@ -47,12 +47,12 @@ This keeps the UI-facing API stable (e.g. `transcode()`, `upload()`) while allow
 - Object key format:
   - `"<ossPrefix><yyyy/MM/dd>/<recordingId>/original.<ext>"`
 - Updates:
-  - `task.originalFileUrl`
+  - `task.originalOssUrl`
   - `task.status`: `recorded` → `uploadingRaw` → `uploadedRaw`
 
 ## Transcode
 
-`MeetingPipelineManager.transcode()` triggers the full pipeline start. The actual work is performed by `TranscodeNode`.
+`MeetingPipelineManager.transcode()` triggers the transcode step. The actual work is performed by `TranscodeNode`.
 
 - Input: `task.localFilePath` (typically `...mixed.m4a`)
 - Output: `mixed_48k.m4a` in the same folder
@@ -97,7 +97,7 @@ Feature toggles influence parameters:
 On success:
 
 - Saves `task.tingwuTaskId`
-- Moves status to `polling`
+- Moves status to `created` (UI can start polling next)
 
 ## Poll and Parse Results
 

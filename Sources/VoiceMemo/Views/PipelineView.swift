@@ -13,7 +13,6 @@ struct PipelineView: View {
     private let settings: SettingsStore
     @State private var showingResult = false
     
-    // Rerun interaction
     @State private var stepToRerun: MeetingTaskStatus?
     @State private var showRerunAlert = false
     
@@ -41,7 +40,6 @@ struct PipelineView: View {
 
     var body: some View {
         VStack(spacing: 32) {
-            // Pipeline Steps
             HStack(spacing: 0) {
                 ForEach(Array(pipelineSteps.enumerated()), id: \.element.id) { index, step in
                     stepButton(for: step)
@@ -56,14 +54,12 @@ struct PipelineView: View {
             .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
             .cornerRadius(16)
             
-            // Separated Mode Status
             if manager.task.mode == .separated {
                 SeparatedStatusView(task: manager.task) { speakerId in
                     Task { await manager.retry(speaker: speakerId) }
                 }
             }
             
-            // Action Area
             VStack(spacing: 16) {
                 if let error = manager.errorMessage {
                     HStack {
@@ -110,11 +106,9 @@ struct PipelineView: View {
                 rerun(step)
             }
         } message: { step in
-            Text("Are you sure you want to rerun '\(stepTitle(step))'? This might overwrite existing data.")
+            Text("Rerun '\(stepTitle(step))'? Cached artifacts for this step will be cleared.")
         }
     }
-    
-    // MARK: - Helpers
     
     @ViewBuilder
     private func stepButton(for descriptor: PipelineStepDescriptor) -> some View {
@@ -132,18 +126,14 @@ struct PipelineView: View {
                     isCompleted: descriptor.isAlwaysCompleted || isAfter(descriptor.id),
                     isFailed: isFailed(descriptor.id)
                 )
-                .contentShape(Rectangle()) // Make sure the whole area is clickable
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.accentColor, lineWidth: 0) // Placeholder for hover effect if needed
-                )
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .onHover { inside in
                 if inside {
-                    NSCursor.pointingHand.push()
+                    NSCursor.pointingHand.set()
                 } else {
-                    NSCursor.pop()
+                    NSCursor.arrow.set()
                 }
             }
             .help("Click to rerun this step")
@@ -159,11 +149,12 @@ struct PipelineView: View {
     }
     
     private func stepTitle(_ step: MeetingTaskStatus) -> String {
-        return pipelineSteps.first(where: { $0.id == step })?.title ?? step.rawValue
+        pipelineSteps.first(where: { $0.id == step })?.title ?? step.rawValue
     }
 
     private func rerun(_ step: MeetingTaskStatus) {
         Task {
+            await manager.prepareForRerun(step: step)
             switch step {
             case .uploadingRaw: await manager.uploadOriginal()
             case .transcoding: await manager.transcode(force: true)
@@ -172,15 +163,6 @@ struct PipelineView: View {
             case .polling: await manager.pollStatus()
             default: break
             }
-        }
-    }
-    
-    private var statusColor: Color {
-        switch manager.task.status {
-        case .completed: return .green
-        case .failed: return .red
-        case .recorded: return .blue
-        default: return .orange
         }
     }
     
@@ -222,6 +204,9 @@ struct PipelineView: View {
     
     private func isFailed(_ step: MeetingTaskStatus) -> Bool {
         guard manager.task.status == .failed else { return false }
+        if manager.task.mode == .separated {
+            return manager.task.speaker1FailedStep == step || manager.task.speaker2FailedStep == step
+        }
         return manager.task.failedStep == step
     }
     
@@ -253,8 +238,6 @@ struct PipelineView: View {
                         .buttonStyle(.borderedProminent)
                     }
                 } else {
-                    // Separated mode retry handled in SeparatedStatusView mostly
-                    // But provide a global retry if generic failure
                     if manager.task.speaker1Status == .failed || manager.task.speaker2Status == .failed {
                          Text("Check individual speakers above")
                             .foregroundColor(.secondary)
@@ -361,7 +344,6 @@ struct SpeakerStatusItem: View {
         if let status = status {
             return status.displayName
         }
-        // Fallback to global status if individual status is not yet tracked (e.g. pre-polling)
         if globalStatus == .polling {
             return "Pending..."
         }

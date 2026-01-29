@@ -69,6 +69,139 @@ class MeetingPipelineManager: ObservableObject {
             await runSeparatedPipeline(from: .polling)
         }
     }
+
+    func prepareForRerun(step: MeetingTaskStatus, speaker: Int? = nil) async {
+        let (mixedRawPath, mixedTranscodedPath, speaker1RawPath, speaker1TranscodedPath, speaker2RawPath, speaker2TranscodedPath) = await MainActor.run {
+            let mixedRaw = preferredRawPath(for: task.localFilePath)
+            let mixedTranscoded = inferredTranscodedPath(for: mixedRaw, channelId: 0)
+            let s1Raw = task.speaker1AudioPath.map { preferredRawPath(for: $0) }
+            let s1Transcoded = s1Raw.map { inferredTranscodedPath(for: $0, channelId: 1) }
+            let s2Raw = task.speaker2AudioPath.map { preferredRawPath(for: $0) }
+            let s2Transcoded = s2Raw.map { inferredTranscodedPath(for: $0, channelId: 2) }
+            return (mixedRaw, mixedTranscoded, s1Raw, s1Transcoded, s2Raw, s2Transcoded)
+        }
+        
+        let shouldClearMixed = (task.mode == .mixed) && (speaker == nil || speaker == 0)
+        let shouldClearSpk1 = (task.mode == .separated) && (speaker == nil || speaker == 1)
+        let shouldClearSpk2 = (task.mode == .separated) && (speaker == nil || speaker == 2)
+
+        if step == .transcoding {
+            if shouldClearMixed && FileManager.default.fileExists(atPath: mixedTranscodedPath) {
+                try? FileManager.default.removeItem(atPath: mixedTranscodedPath)
+            }
+            if shouldClearSpk1, let path = speaker1TranscodedPath, FileManager.default.fileExists(atPath: path) {
+                try? FileManager.default.removeItem(atPath: path)
+            }
+            if shouldClearSpk2, let path = speaker2TranscodedPath, FileManager.default.fileExists(atPath: path) {
+                try? FileManager.default.removeItem(atPath: path)
+            }
+        }
+
+        await MainActor.run {
+            var t = self.task
+
+            if step == .uploadingRaw || step == .transcoding {
+                if shouldClearMixed { t.localFilePath = mixedRawPath }
+                if shouldClearSpk1 { t.speaker1AudioPath = speaker1RawPath }
+                if shouldClearSpk2 { t.speaker2AudioPath = speaker2RawPath }
+            }
+
+            switch step {
+            case .uploadingRaw:
+                if shouldClearMixed {
+                    t.originalOssUrl = nil; t.ossUrl = nil; t.tingwuTaskId = nil
+                    t.transcript = nil; t.summary = nil
+                    t.status = .recorded
+                }
+                if shouldClearSpk1 {
+                    t.originalOssUrl = nil; t.ossUrl = nil; t.tingwuTaskId = nil
+                    t.speaker1Transcript = nil
+                    // Note: In separated mode, we might want to track status per speaker,
+                    // but we also reset global status to reflect "work in progress" if we want the main UI to update.
+                    // However, let's stick to updating speaker status.
+                    t.speaker1Status = nil 
+                }
+                if shouldClearSpk2 {
+                    t.speaker2OriginalOssUrl = nil; t.speaker2OssUrl = nil; t.speaker2TingwuTaskId = nil
+                    t.speaker2Transcript = nil
+                    t.speaker2Status = nil
+                }
+            case .transcoding:
+                if shouldClearMixed {
+                    t.ossUrl = nil; t.tingwuTaskId = nil
+                    t.transcript = nil; t.summary = nil
+                    t.status = .uploadedRaw
+                }
+                if shouldClearSpk1 {
+                    t.ossUrl = nil; t.tingwuTaskId = nil
+                    t.speaker1Transcript = nil
+                    t.speaker1Status = nil
+                }
+                if shouldClearSpk2 {
+                    t.speaker2OssUrl = nil; t.speaker2TingwuTaskId = nil
+                    t.speaker2Transcript = nil
+                    t.speaker2Status = nil
+                }
+            case .uploading:
+                if shouldClearMixed {
+                    t.ossUrl = nil; t.tingwuTaskId = nil
+                    t.transcript = nil; t.summary = nil
+                    t.status = .transcoded
+                }
+                if shouldClearSpk1 {
+                    t.ossUrl = nil; t.tingwuTaskId = nil
+                    t.speaker1Transcript = nil
+                    t.speaker1Status = nil
+                }
+                if shouldClearSpk2 {
+                    t.speaker2OssUrl = nil; t.speaker2TingwuTaskId = nil
+                    t.speaker2Transcript = nil
+                    t.speaker2Status = nil
+                }
+            case .created:
+                if shouldClearMixed {
+                    t.tingwuTaskId = nil
+                    t.transcript = nil; t.summary = nil
+                    t.status = .uploaded
+                }
+                if shouldClearSpk1 {
+                    t.tingwuTaskId = nil
+                    t.speaker1Transcript = nil
+                    t.speaker1Status = nil
+                }
+                if shouldClearSpk2 {
+                    t.speaker2TingwuTaskId = nil
+                    t.speaker2Transcript = nil
+                    t.speaker2Status = nil
+                }
+            case .polling:
+                if shouldClearMixed {
+                    t.transcript = nil; t.summary = nil
+                    t.status = .created
+                }
+                if shouldClearSpk1 {
+                    t.speaker1Transcript = nil
+                    t.speaker1Status = nil
+                }
+                if shouldClearSpk2 {
+                    t.speaker2Transcript = nil
+                    t.speaker2Status = nil
+                }
+            default:
+                break
+            }
+
+            if shouldClearMixed { t.lastError = nil; t.failedStep = nil }
+            if shouldClearSpk1 { t.speaker1FailedStep = nil }
+            if shouldClearSpk2 { t.speaker2FailedStep = nil }
+
+            self.task = t
+            self.errorMessage = nil
+            self.isProcessing = false
+        }
+
+        self.save()
+    }
     
     // MARK: - Retry Logic
     
@@ -81,6 +214,7 @@ class MeetingPipelineManager: ObservableObject {
         
         if task.mode == .mixed {
             let startStep = task.failedStep ?? .recorded
+            await prepareForRerun(step: startStep, speaker: nil)
             await runPipeline(from: startStep, targetSpeaker: nil)
         } else {
             // Separated Mode
@@ -91,9 +225,12 @@ class MeetingPipelineManager: ObservableObject {
                 } else {
                     startStep = task.speaker2FailedStep ?? .recorded
                 }
+                await prepareForRerun(step: startStep, speaker: spk)
                 await runSingleTrack(from: startStep, speaker: spk)
                 await tryAlign()
             } else {
+                // Global rerun for separated mode: clear everything and start from beginning
+                await prepareForRerun(step: .recorded, speaker: nil)
                 await runSeparatedPipeline()
             }
         }
@@ -274,20 +411,38 @@ class MeetingPipelineManager: ObservableObject {
         
         // Hydrate Mixed Channel (0)
         var mixed = ChannelData()
-        mixed.rawAudioPath = task.localFilePath
+        mixed.rawAudioPath = preferredRawPath(for: task.localFilePath)
+        let mixedTranscoded = inferredTranscodedPath(for: mixed.rawAudioPath!, channelId: 0)
+        if FileManager.default.fileExists(atPath: mixedTranscoded) {
+            mixed.processedAudioPath = mixedTranscoded
+        } else {
+            // Fallback: if localFilePath points to the processed file (legacy/reused field)
+            // But we should be careful. Let's trust inferred path first.
+            // If inferred file doesn't exist, maybe the task is not transcoded yet.
+            // Keeping processedAudioPath nil is safer than assigning raw path.
+            // However, to be compatible with existing logic where localFilePath might BE the processed path:
+            if task.localFilePath.hasSuffix("_48k.m4a") {
+                mixed.processedAudioPath = task.localFilePath
+            }
+        }
         mixed.rawAudioOssURL = task.originalOssUrl
         mixed.processedAudioOssURL = task.ossUrl
         mixed.tingwuTaskId = task.tingwuTaskId
         board.channels[0] = mixed
         
         // Hydrate Speaker Channels (Separated Mode)
-        // Note: In separated mode, Speaker 1 reuses the main MeetingTask fields
-        // (originalOssUrl, ossUrl, tingwuTaskId) for compatibility with mixed mode.
-        // Speaker 2 uses dedicated speaker2* fields.
         if task.mode == .separated {
-            // Speaker 1 (Channel 1) - Reuses main MeetingTask fields
+            // Speaker 1 (Channel 1)
             var spk1 = ChannelData()
-            spk1.rawAudioPath = task.speaker1AudioPath
+            if let p = task.speaker1AudioPath {
+                spk1.rawAudioPath = preferredRawPath(for: p)
+                let t = inferredTranscodedPath(for: spk1.rawAudioPath!, channelId: 1)
+                if FileManager.default.fileExists(atPath: t) {
+                    spk1.processedAudioPath = t
+                } else if p.hasSuffix("_48k.m4a") {
+                    spk1.processedAudioPath = p
+                }
+            }
             spk1.rawAudioOssURL = task.originalOssUrl
             spk1.processedAudioOssURL = task.ossUrl
             spk1.tingwuTaskId = task.tingwuTaskId
@@ -300,9 +455,17 @@ class MeetingPipelineManager: ObservableObject {
             }
             board.channels[1] = spk1
             
-            // Speaker 2 (Channel 2) - Uses dedicated speaker2* fields
+            // Speaker 2 (Channel 2)
             var spk2 = ChannelData()
-            spk2.rawAudioPath = task.speaker2AudioPath
+            if let p = task.speaker2AudioPath {
+                spk2.rawAudioPath = preferredRawPath(for: p)
+                let t = inferredTranscodedPath(for: spk2.rawAudioPath!, channelId: 2)
+                if FileManager.default.fileExists(atPath: t) {
+                    spk2.processedAudioPath = t
+                } else if p.hasSuffix("_48k.m4a") {
+                    spk2.processedAudioPath = p
+                }
+            }
             spk2.rawAudioOssURL = task.speaker2OriginalOssUrl
             spk2.processedAudioOssURL = task.speaker2OssUrl
             spk2.tingwuTaskId = task.speaker2TingwuTaskId
@@ -317,6 +480,35 @@ class MeetingPipelineManager: ObservableObject {
         }
         
         return board
+    }
+
+    private func preferredRawPath(for path: String) -> String {
+        let candidate = inferredRawPath(from: path)
+        if FileManager.default.fileExists(atPath: candidate) {
+            return candidate
+        }
+        return path
+    }
+
+    private func inferredRawPath(from path: String) -> String {
+        let url = URL(fileURLWithPath: path)
+        let name = url.lastPathComponent
+        let dir = url.deletingLastPathComponent()
+        if name == "mixed_48k.m4a" {
+            return dir.appendingPathComponent("mixed.m4a").path
+        }
+        if name.hasSuffix("_48k.m4a") {
+            let rawName = name.replacingOccurrences(of: "_48k.m4a", with: ".m4a")
+            return dir.appendingPathComponent(rawName).path
+        }
+        return path
+    }
+
+    private func inferredTranscodedPath(for rawPath: String, channelId: Int) -> String {
+        let url = URL(fileURLWithPath: rawPath)
+        let dir = url.deletingLastPathComponent()
+        let name = channelId == 0 ? "mixed_48k.m4a" : "speaker\(channelId)_48k.m4a"
+        return dir.appendingPathComponent(name).path
     }
     
     private func persistState(from board: PipelineBoard, channelId: Int, completedStep: MeetingTaskStatus) async {
