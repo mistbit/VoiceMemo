@@ -53,7 +53,13 @@ struct ContentView: View {
                     case .importAudio:
                         List(ImportModeItem.allCases, selection: $selectedImportMode) { mode in
                             NavigationLink(value: mode) {
-                                Label(mode.title, systemImage: mode.icon)
+                                VStack(alignment: .leading) {
+                                    Label(mode.title, systemImage: mode.icon)
+                                    Text(mode.description)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 4)
                             }
                         }
                         .navigationTitle("Import")
@@ -65,7 +71,13 @@ struct ContentView: View {
                     case .settings:
                         List(SettingsCategory.allCases, selection: $selectedSettingsCategory) { category in
                             NavigationLink(value: category) {
-                                Label(category.title, systemImage: category.icon)
+                                VStack(alignment: .leading) {
+                                    Label(category.title, systemImage: category.icon)
+                                    Text(category.description)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 4)
                             }
                         }
                         .navigationTitle("Settings")

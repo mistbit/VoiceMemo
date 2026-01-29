@@ -73,6 +73,12 @@ enum ImportModeItem: String, Hashable, CaseIterable, Identifiable {
         }
     }
     
+    var description: String {
+        switch self {
+        case .file: return "Import local audio files to create tasks."
+        }
+    }
+    
     var icon: String {
         switch self {
         case .file: return "doc.badge.plus"
@@ -92,6 +98,14 @@ enum SettingsCategory: String, Hashable, CaseIterable, Identifiable {
         case .general: return "General"
         case .cloud: return "Cloud & AI"
         case .storage: return "Storage"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .general: return "Basic settings including language and appearance."
+        case .cloud: return "Configure cloud services and AI parameters."
+        case .storage: return "Manage data persistence and database connections."
         }
     }
     
