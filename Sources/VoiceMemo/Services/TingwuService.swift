@@ -138,10 +138,15 @@ class TingwuService {
         
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         
-        guard let dataObj = json?["Data"] as? [String: Any],
+        guard var dataObj = json?["Data"] as? [String: Any],
               let status = dataObj["TaskStatus"] as? String else {
              throw NSError(domain: "TingwuService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid status response"])
         }
+        
+        // Inject top-level fields for better error handling
+        if let msg = json?["Message"] as? String { dataObj["_OuterMessage"] = msg }
+        if let code = json?["Code"] as? String { dataObj["_OuterCode"] = code }
+        if let reqId = json?["RequestId"] as? String { dataObj["_RequestId"] = reqId }
         
         // Return full data object as result if completed
         return (status, dataObj)

@@ -120,7 +120,7 @@ class MeetingPipelineManager: ObservableObject {
         resetTask.speaker2Status = nil
         
         self.task = resetTask
-        self.save()
+        await self.save()
         
         await start()
     }
@@ -274,7 +274,25 @@ class MeetingPipelineManager: ObservableObject {
         
         // Hydrate Mixed Channel (0)
         var mixed = ChannelData()
-        mixed.rawAudioPath = task.localFilePath
+        
+        // Fix: Resolve processed path if missing
+        let path = task.localFilePath
+        if !path.isEmpty {
+            if path.hasSuffix("_48k.m4a") {
+                mixed.processedAudioPath = path
+                mixed.rawAudioPath = path // Fallback
+            } else {
+                mixed.rawAudioPath = path
+                // Check for existing processed file
+                let url = URL(fileURLWithPath: path)
+                let processedFilename = "mixed_48k.m4a"
+                let processedUrl = url.deletingLastPathComponent().appendingPathComponent(processedFilename)
+                if FileManager.default.fileExists(atPath: processedUrl.path) {
+                    mixed.processedAudioPath = processedUrl.path
+                }
+            }
+        }
+        
         mixed.rawAudioOssURL = task.originalOssUrl
         mixed.processedAudioOssURL = task.ossUrl
         mixed.tingwuTaskId = task.tingwuTaskId
@@ -287,7 +305,21 @@ class MeetingPipelineManager: ObservableObject {
         if task.mode == .separated {
             // Speaker 1 (Channel 1) - Reuses main MeetingTask fields
             var spk1 = ChannelData()
-            spk1.rawAudioPath = task.speaker1AudioPath
+            
+            if let path = task.speaker1AudioPath {
+                if path.hasSuffix("_48k.m4a") {
+                    spk1.processedAudioPath = path
+                    spk1.rawAudioPath = path
+                } else {
+                    spk1.rawAudioPath = path
+                    let url = URL(fileURLWithPath: path)
+                    let processedUrl = url.deletingLastPathComponent().appendingPathComponent("speaker1_48k.m4a")
+                    if FileManager.default.fileExists(atPath: processedUrl.path) {
+                        spk1.processedAudioPath = processedUrl.path
+                    }
+                }
+            }
+            
             spk1.rawAudioOssURL = task.originalOssUrl
             spk1.processedAudioOssURL = task.ossUrl
             spk1.tingwuTaskId = task.tingwuTaskId
@@ -302,7 +334,21 @@ class MeetingPipelineManager: ObservableObject {
             
             // Speaker 2 (Channel 2) - Uses dedicated speaker2* fields
             var spk2 = ChannelData()
-            spk2.rawAudioPath = task.speaker2AudioPath
+            
+            if let path = task.speaker2AudioPath {
+                if path.hasSuffix("_48k.m4a") {
+                    spk2.processedAudioPath = path
+                    spk2.rawAudioPath = path
+                } else {
+                    spk2.rawAudioPath = path
+                    let url = URL(fileURLWithPath: path)
+                    let processedUrl = url.deletingLastPathComponent().appendingPathComponent("speaker2_48k.m4a")
+                    if FileManager.default.fileExists(atPath: processedUrl.path) {
+                        spk2.processedAudioPath = processedUrl.path
+                    }
+                }
+            }
+            
             spk2.rawAudioOssURL = task.speaker2OriginalOssUrl
             spk2.processedAudioOssURL = task.speaker2OssUrl
             spk2.tingwuTaskId = task.speaker2TingwuTaskId
@@ -326,8 +372,8 @@ class MeetingPipelineManager: ObservableObject {
             updateChannelFields(channelId: channelId, channel: channel)
             updateChannelStatus(channelId: channelId, completedStep: completedStep)
             self.errorMessage = nil
-            self.save()
         }
+        await self.save()
     }
     
     private func updateChannelFields(channelId: Int, channel: ChannelData) {
@@ -416,11 +462,11 @@ class MeetingPipelineManager: ObservableObject {
                 self.errorMessage = nil
             }
         }
-        self.save()
+        await self.save()
     }
     
     private func tryAlign() async {
-        await MainActor.run {
+        let shouldSave = await MainActor.run { () -> Bool in
             let t1 = self.task.speaker1Transcript ?? ""
             let t2 = self.task.speaker2Transcript ?? ""
             
@@ -430,8 +476,12 @@ class MeetingPipelineManager: ObservableObject {
                 if !t2.isEmpty { merged += "### Speaker 2 (Remote)\n\(t2)\n" }
                 self.task.transcript = merged
                 self.task.status = .completed
-                self.save()
+                return true
             }
+            return false
+        }
+        if shouldSave {
+            await self.save()
         }
     }
     
@@ -441,10 +491,8 @@ class MeetingPipelineManager: ObservableObject {
         return TranscriptParser.buildTranscriptText(from: transcriptionData) ?? ""
     }
     
-    private func save() {
-        Task { @MainActor in
-            let snapshot = self.task
-            try? await StorageManager.shared.currentProvider.saveTask(snapshot)
-        }
+    private func save() async {
+        let snapshot = await MainActor.run { self.task }
+        try? await StorageManager.shared.currentProvider.saveTask(snapshot)
     }
 }

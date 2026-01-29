@@ -210,7 +210,15 @@ class PollingNode: PipelineNode {
                 }
             }
         } else if status == "FAILED" {
-            let errorMsg = (data?["StatusText"] as? String) ?? "Unknown cloud error"
+            let errorMsg = (data?["StatusText"] as? String) 
+                ?? (data?["_OuterMessage"] as? String)
+                ?? "Unknown cloud error"
+            
+            // Debug logging
+            if let data = data {
+                print("PollingNode: Task Failed. Data: \(data)")
+            }
+            
             throw PipelineError.cloudError(errorMsg)
         } else {
             // Still running
