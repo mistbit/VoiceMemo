@@ -40,7 +40,7 @@ struct SettingsView: View {
                 }
             }
             .padding()
-            .frame(maxWidth: 800)
+            .frame(maxWidth: Layout.containerWidth)
             .frame(maxWidth: .infinity, alignment: .top)
         }
         .sheet(isPresented: $showingLog) {
@@ -69,14 +69,86 @@ struct SettingsView: View {
         }
     }
     
+    // MARK: - Constants
+    
+    private enum Layout {
+        static let labelWidth: CGFloat = 120
+        static let containerWidth: CGFloat = 800
+        static let standardPickerWidth: CGFloat = 200
+        static let widePickerWidth: CGFloat = 240
+        static let shortFieldWidth: CGFloat = 80
+        static let standardSpacing: CGFloat = 20
+        static let groupSpacing: CGFloat = 12
+    }
+
     // MARK: - Helper Views
     
     private func FormRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
         HStack(alignment: .firstTextBaseline) {
             Text(label)
-                .frame(width: 120, alignment: .trailing)
+                .frame(width: Layout.labelWidth, alignment: .trailing)
                 .foregroundColor(.secondary)
             content()
+        }
+    }
+    
+    private struct StyledGroupBox<Content: View>: View {
+        let label: String
+        let spacing: CGFloat
+        let content: Content
+        
+        init(_ label: String, spacing: CGFloat = Layout.groupSpacing, @ViewBuilder content: () -> Content) {
+            self.label = label
+            self.spacing = spacing
+            self.content = content()
+        }
+        
+        var body: some View {
+            GroupBox(label: Text(label).bold()) {
+                VStack(alignment: .leading, spacing: spacing) {
+                    content
+                }
+                .padding(8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+    
+    private struct CredentialRow: View {
+        let hasValue: Bool
+        @Binding var input: String
+        let placeholder: String
+        let isSecure: Bool
+        var onSave: (() -> Void)? = nil
+        let onClear: () -> Void
+        
+        var body: some View {
+            if hasValue {
+                HStack {
+                    Text("******")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Button("Clear", action: onClear)
+                }
+            } else {
+                HStack {
+                    if isSecure {
+                        SecureField(placeholder, text: $input)
+                            .textFieldStyle(.roundedBorder)
+                    } else {
+                        TextField(placeholder, text: $input)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    if let onSave = onSave {
+                        Button("Save") {
+                            onSave()
+                            input = ""
+                        }
+                        .disabled(input.isEmpty)
+                    }
+                }
+            }
         }
     }
     
@@ -104,328 +176,272 @@ struct SettingsView: View {
     // MARK: - Forms
     
     private var generalForm: some View {
-        VStack(spacing: 20) {
-            GroupBox(label: Text("Audio & Features").bold()) {
-                VStack(spacing: 16) {
-                    FormRow(label: "Language") {
-                        Spacer()
-                        Picker("", selection: $settings.language) {
-                            Text("Chinese (cn)").tag("cn")
-                            Text("Mixed (cn_en)").tag("cn_en")
-                        }
-                        .labelsHidden()
-                        .frame(width: 200)
+        VStack(spacing: Layout.standardSpacing) {
+            StyledGroupBox("Audio & Features", spacing: 16) {
+                FormRow(label: "Language") {
+                    Picker("", selection: $settings.language) {
+                        Text("Chinese (cn)").tag("cn")
+                        Text("Mixed (cn_en)").tag("cn_en")
                     }
-                    
-                    Divider()
-                    
-                    FormRow(label: "Role Split") {
-                        Spacer()
-                        Toggle("Enable Role Split", isOn: $settings.enableRoleSplit)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                        Text("Distinguish speakers in audio")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.leading, 8)
-                    }
-                    
-                    Divider()
-                    
-                    // AI Features Group
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("AI Analysis")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .padding(.leading, 120) // Align with form content
-                        
-                        VStack(spacing: 0) {
-                            ToggleRow(icon: "doc.text", title: "Summary", isOn: $settings.enableSummary)
-                            Divider().padding(.leading, 44)
-                            ToggleRow(icon: "list.bullet.rectangle", title: "Key Points", isOn: $settings.enableKeyPoints)
-                            Divider().padding(.leading, 44)
-                            ToggleRow(icon: "checkmark.square", title: "Action Items", isOn: $settings.enableActionItems)
-                        }
-                        .background(Color(nsColor: .controlBackgroundColor))
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
-                        )
-                        .padding(.leading, 120) // Align with form content
-                    }
+                    .labelsHidden()
+                    .frame(maxWidth: Layout.standardPickerWidth)
                 }
-                .padding(8)
+                
+                Divider()
+                
+                FormRow(label: "Role Split") {
+                    Toggle("Enable Role Split", isOn: $settings.enableRoleSplit)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                    Text("Distinguish speakers in audio")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.leading, 8)
+                }
+                
+                Divider()
+                
+                // AI Features Group
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("AI Analysis")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.leading, Layout.labelWidth) // Align with form content
+                    
+                    VStack(spacing: 0) {
+                        ToggleRow(icon: "doc.text", title: "Summary", isOn: $settings.enableSummary)
+                        Divider().padding(.leading, 44)
+                        ToggleRow(icon: "list.bullet.rectangle", title: "Key Points", isOn: $settings.enableKeyPoints)
+                        Divider().padding(.leading, 44)
+                        ToggleRow(icon: "checkmark.square", title: "Action Items", isOn: $settings.enableActionItems)
+                    }
+                    .background(Color(nsColor: .controlBackgroundColor))
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.secondary.opacity(0.1), lineWidth: 1)
+                    )
+                    .padding(.leading, Layout.labelWidth) // Align with form content
+                }
             }
 
-            GroupBox(label: Text("Appearance").bold()) {
-                VStack(spacing: 12) {
-                    FormRow(label: "Theme") {
-                        Spacer()
-                        Picker("", selection: $settings.appTheme) {
-                            Text("Auto").tag(SettingsStore.AppTheme.system)
-                            Text("Light").tag(SettingsStore.AppTheme.light)
-                            Text("Dark").tag(SettingsStore.AppTheme.dark)
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                        .frame(width: 240)
+            StyledGroupBox("Appearance") {
+                FormRow(label: "Theme") {
+                    Picker("", selection: $settings.appTheme) {
+                        Text("Auto").tag(SettingsStore.AppTheme.system)
+                        Text("Light").tag(SettingsStore.AppTheme.light)
+                        Text("Dark").tag(SettingsStore.AppTheme.dark)
                     }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: Layout.widePickerWidth)
+                    
+                    Spacer()
                 }
-                .padding(8)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
             
-            GroupBox(label: Text("Logs").bold()) {
-                VStack(spacing: 12) {
-                    FormRow(label: "Settings") {
-                        Spacer()
-                        Toggle("Verbose Logging", isOn: $settings.enableVerboseLogging)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                        Text("Enable detailed debug logs")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.leading, 8)
-                    }
-                    
-                    Divider()
-                    
-                    FormRow(label: "Path") {
-                        Text(settings.logFileURL().path)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .textSelection(.enabled)
-                    }
-                    
-                    FormRow(label: "Actions") {
-                        HStack {
-                            Spacer()
-                            Button("Show Log") {
-                                logText = settings.readLogText()
-                                showingLog = true
-                            }
-                            Button("Open Folder") {
-                                let url = settings.logFileURL().deletingLastPathComponent()
-                                NSWorkspace.shared.open(url)
-                            }
-                            Button("Clear Log") {
-                                settings.clearLogFile()
-                                logText = ""
-                            }
+            StyledGroupBox("Logs") {
+                FormRow(label: "Settings") {
+                    Toggle("Verbose Logging", isOn: $settings.enableVerboseLogging)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                    Text("Enable detailed debug logs")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.leading, 8)
+                }
+                
+                Divider()
+                
+                FormRow(label: "Path") {
+                    Text(settings.logFileURL().path)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .textSelection(.enabled)
+                }
+                
+                FormRow(label: "Actions") {
+                    HStack {
+                        Button("Show Log") {
+                            logText = settings.readLogText()
+                            showingLog = true
+                        }
+                        Button("Open Folder") {
+                            let url = settings.logFileURL().deletingLastPathComponent()
+                            NSWorkspace.shared.open(url)
+                        }
+                        Button("Clear Log") {
+                            settings.clearLogFile()
+                            logText = ""
                         }
                     }
                 }
-                .padding(8)
             }
         }
     }
     
     private var cloudForm: some View {
-        VStack(spacing: 20) {
-            GroupBox(label: Text("Tingwu Configuration").bold()) {
-                VStack(spacing: 12) {
-                    FormRow(label: "AppKey") {
-                        TextField("Required", text: $settings.tingwuAppKey)
-                            .textFieldStyle(.roundedBorder)
-                    }
+        VStack(spacing: Layout.standardSpacing) {
+            StyledGroupBox("Tingwu Configuration") {
+                FormRow(label: "AppKey") {
+                    TextField("Required", text: $settings.tingwuAppKey)
+                        .textFieldStyle(.roundedBorder)
                 }
-                .padding(8)
             }
             
-            GroupBox(label: Text("OSS Configuration").bold()) {
-                VStack(spacing: 12) {
-                    FormRow(label: "Region") {
-                        TextField("e.g. cn-beijing", text: $settings.ossRegion)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    FormRow(label: "Endpoint") {
-                        TextField("e.g. oss-cn-beijing.aliyuncs.com", text: $settings.ossEndpoint)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    FormRow(label: "Bucket") {
-                        TextField("Bucket Name", text: $settings.ossBucket)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    FormRow(label: "Prefix") {
-                        TextField("Path Prefix (e.g. voice/)", text: $settings.ossPrefix)
-                            .textFieldStyle(.roundedBorder)
-                    }
+            StyledGroupBox("OSS Configuration") {
+                FormRow(label: "Region") {
+                    TextField("e.g. cn-beijing", text: $settings.ossRegion)
+                        .textFieldStyle(.roundedBorder)
                 }
-                .padding(8)
+                FormRow(label: "Endpoint") {
+                    TextField("e.g. oss-cn-beijing.aliyuncs.com", text: $settings.ossEndpoint)
+                        .textFieldStyle(.roundedBorder)
+                }
+                FormRow(label: "Bucket") {
+                    TextField("Bucket Name", text: $settings.ossBucket)
+                        .textFieldStyle(.roundedBorder)
+                }
+                FormRow(label: "Prefix") {
+                    TextField("Path Prefix (e.g. voice/)", text: $settings.ossPrefix)
+                        .textFieldStyle(.roundedBorder)
+                }
             }
             
-            GroupBox(label: Text("Access Credentials (RAM)").bold()) {
-                VStack(spacing: 12) {
-                    FormRow(label: "AccessKeyId") {
-                        if settings.hasAccessKeyId {
-                            HStack {
-                                Text("******")
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Button("Clear") { settings.clearSecrets() }
-                            }
-                        } else {
-                            TextField("Paste AccessKeyId", text: $akIdInput)
-                                .textFieldStyle(.roundedBorder)
+            StyledGroupBox("Access Credentials (RAM)") {
+                FormRow(label: "AccessKeyId") {
+                    CredentialRow(
+                        hasValue: settings.hasAccessKeyId,
+                        input: $akIdInput,
+                        placeholder: "Paste AccessKeyId",
+                        isSecure: false,
+                        onClear: { settings.clearSecrets() }
+                    )
+                }
+                
+                FormRow(label: "AccessKeySecret") {
+                    CredentialRow(
+                        hasValue: settings.hasAccessKeySecret,
+                        input: $akSecretInput,
+                        placeholder: "Paste AccessKeySecret",
+                        isSecure: true,
+                        onClear: { settings.clearSecrets() }
+                    )
+                }
+                
+                if !settings.hasAccessKeyId || !settings.hasAccessKeySecret {
+                    HStack {
+                        Spacer()
+                        Button("Save Credentials") {
+                            if !akIdInput.isEmpty { settings.saveAccessKeyId(akIdInput) }
+                            if !akSecretInput.isEmpty { settings.saveAccessKeySecret(akSecretInput) }
+                            akIdInput = ""
+                            akSecretInput = ""
                         }
-                    }
-                    
-                    FormRow(label: "AccessKeySecret") {
-                        if settings.hasAccessKeySecret {
-                            HStack {
-                                Text("******")
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Button("Clear") { settings.clearSecrets() }
-                            }
-                        } else {
-                            SecureField("Paste AccessKeySecret", text: $akSecretInput)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                    }
-                    
-                    if !settings.hasAccessKeyId || !settings.hasAccessKeySecret {
-                        HStack {
-                            Spacer()
-                            Button("Save Credentials") {
-                                if !akIdInput.isEmpty { settings.saveAccessKeyId(akIdInput) }
-                                if !akSecretInput.isEmpty { settings.saveAccessKeySecret(akSecretInput) }
-                                akIdInput = ""
-                                akSecretInput = ""
-                            }
-                            .disabled(akIdInput.isEmpty || akSecretInput.isEmpty)
-                        }
+                        .disabled(akIdInput.isEmpty || akSecretInput.isEmpty)
                     }
                 }
-                .padding(8)
             }
             
-            GroupBox(label: Text("Connection Test").bold()) {
-                VStack(spacing: 12) {
-                    FormRow(label: "OSS Upload") {
-                        HStack {
-                            Spacer()
-                            Button("Test Upload") {
-                                Task { await testUpload() }
-                            }
-                            if !testStatus.isEmpty {
-                                Text(testStatus)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+            StyledGroupBox("Connection Test") {
+                FormRow(label: "OSS Upload") {
+                    HStack {
+                        Button("Test Upload") {
+                            Task { await testUpload() }
+                        }
+                        if !testStatus.isEmpty {
+                            Text(testStatus)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
                     }
                 }
-                .padding(8)
             }
         }
     }
     
     private var storageForm: some View {
-        VStack(spacing: 20) {
-            GroupBox(label: Text("Storage Type").bold()) {
-                VStack(spacing: 12) {
-                    FormRow(label: "Type") {
-                        Spacer()
-                        Picker("", selection: $settings.storageType) {
-                            Text("Local (SQLite)").tag(SettingsStore.StorageType.local)
-                            Text("MySQL").tag(SettingsStore.StorageType.mysql)
-                        }
-                        .labelsHidden()
-                        .frame(width: 200)
+        VStack(spacing: Layout.standardSpacing) {
+            StyledGroupBox("Storage Type") {
+                FormRow(label: "Type") {
+                    Picker("", selection: $settings.storageType) {
+                        Text("Local (SQLite)").tag(SettingsStore.StorageType.local)
+                        Text("MySQL").tag(SettingsStore.StorageType.mysql)
                     }
+                    .labelsHidden()
+                    .frame(maxWidth: Layout.standardPickerWidth)
                 }
-                .padding(8)
             }
             
             if settings.storageType == .mysql {
-                GroupBox(label: Text("MySQL Configuration").bold()) {
-                    VStack(spacing: 12) {
-                        FormRow(label: "Host") {
-                            TextField("127.0.0.1", text: $settings.mysqlHost)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                        FormRow(label: "Port") {
-                            TextField("3306", value: $settings.mysqlPort, formatter: NumberFormatter())
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 80)
-                        }
-                        FormRow(label: "User") {
-                            TextField("Username", text: $settings.mysqlUser)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                        FormRow(label: "Database") {
-                            TextField("Database Name", text: $settings.mysqlDatabase)
-                                .textFieldStyle(.roundedBorder)
-                        }
-                        
-                        FormRow(label: "Password") {
-                            if settings.hasMySQLPassword {
-                                HStack {
-                                    Text("******")
-                                        .foregroundColor(.secondary)
-                                    Spacer()
-                                    Button("Clear") { settings.saveMySQLPassword("") }
-                                }
-                            } else {
-                                HStack {
-                                    SecureField("Password", text: $mysqlPasswordInput)
-                                        .textFieldStyle(.roundedBorder)
-                                    Button("Save") {
-                                        settings.saveMySQLPassword(mysqlPasswordInput)
-                                        mysqlPasswordInput = ""
-                                    }
-                                    .disabled(mysqlPasswordInput.isEmpty)
-                                }
-                            }
-                        }
+                StyledGroupBox("MySQL Configuration") {
+                    FormRow(label: "Host") {
+                        TextField("127.0.0.1", text: $settings.mysqlHost)
+                            .textFieldStyle(.roundedBorder)
                     }
-                    .padding(8)
+                    FormRow(label: "Port") {
+                        TextField("3306", value: $settings.mysqlPort, formatter: NumberFormatter())
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: Layout.shortFieldWidth)
+                    }
+                    FormRow(label: "User") {
+                        TextField("Username", text: $settings.mysqlUser)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    FormRow(label: "Database") {
+                        TextField("Database Name", text: $settings.mysqlDatabase)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    FormRow(label: "Password") {
+                        CredentialRow(
+                            hasValue: settings.hasMySQLPassword,
+                            input: $mysqlPasswordInput,
+                            placeholder: "Password",
+                            isSecure: true,
+                            onSave: { settings.saveMySQLPassword(mysqlPasswordInput) },
+                            onClear: { settings.saveMySQLPassword("") }
+                        )
+                    }
                 }
                 
-                GroupBox(label: Text("Actions").bold()) {
-                    VStack(spacing: 12) {
-                        FormRow(label: "Connection") {
-                            HStack {
-                                Spacer()
-                                Button("Test Connection") {
-                                    Task { await testMySQL() }
-                                }
-                                if !mysqlTestStatus.isEmpty {
-                                    Text(mysqlTestStatus)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
+                StyledGroupBox("Actions") {
+                    FormRow(label: "Connection") {
+                        HStack {
+                            Button("Test Connection") {
+                                Task { await testMySQL() }
                             }
-                        }
-                        
-                        Divider()
-                        
-                        FormRow(label: "Sync") {
-                            HStack {
-                                Spacer()
-                                Button("Sync Local to MySQL") {
-                                    Task { await storageManager.syncToMySQL() }
-                                }
-                                .disabled(storageManager.isSyncing)
-                                
-                                if storageManager.isSyncing {
-                                    ProgressView()
-                                        .scaleEffect(0.5)
-                                }
-                            }
-                        }
-                        
-                        if let err = storageManager.syncError {
-                            FormRow(label: "Error") {
-                                Text(err)
-                                    .foregroundColor(.red)
+                            if !mysqlTestStatus.isEmpty {
+                                Text(mysqlTestStatus)
                                     .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                         }
                     }
-                    .padding(8)
+                    
+                    Divider()
+                    
+                    FormRow(label: "Sync") {
+                        HStack {
+                            Button("Sync Local to MySQL") {
+                                Task { await storageManager.syncToMySQL() }
+                            }
+                            .disabled(storageManager.isSyncing)
+                            
+                            if storageManager.isSyncing {
+                                ProgressView()
+                                    .scaleEffect(0.5)
+                            }
+                        }
+                    }
+                    
+                    if let err = storageManager.syncError {
+                        FormRow(label: "Error") {
+                            Text(err)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                    }
                 }
             } else {
                 GroupBox {
@@ -442,6 +458,7 @@ struct SettingsView: View {
                     }
                     .padding(8)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
