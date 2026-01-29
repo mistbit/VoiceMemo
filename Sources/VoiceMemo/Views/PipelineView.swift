@@ -1,5 +1,13 @@
 import SwiftUI
 
+struct PipelineStepDescriptor: Identifiable {
+    let id: MeetingTaskStatus
+    let title: String
+    let icon: String
+    let isInteractive: Bool
+    let isAlwaysCompleted: Bool
+}
+
 struct PipelineView: View {
     @StateObject var manager: MeetingPipelineManager
     private let settings: SettingsStore
@@ -14,24 +22,34 @@ struct PipelineView: View {
         _manager = StateObject(wrappedValue: MeetingPipelineManager(task: task, settings: settings))
     }
     
+    // MARK: - Configuration
+    
+    private var pipelineSteps: [PipelineStepDescriptor] {
+        [
+            .init(id: .recorded, title: "Record", icon: "mic.fill", isInteractive: false, isAlwaysCompleted: true),
+            .init(id: .uploadingRaw, title: "Upload Raw", icon: "arrow.up.doc.fill", isInteractive: true, isAlwaysCompleted: false),
+            .init(id: .transcoding, title: "Transcode", icon: "waveform", isInteractive: true, isAlwaysCompleted: false),
+            .init(id: .uploading, title: "Upload", icon: "icloud.and.arrow.up.fill", isInteractive: true, isAlwaysCompleted: false),
+            .init(id: .created, title: "Create Task", icon: "doc.badge.plus", isInteractive: true, isAlwaysCompleted: false),
+            .init(id: .polling, title: "Poll", icon: "arrow.triangle.2.circlepath", isInteractive: true, isAlwaysCompleted: false)
+        ]
+    }
+    
+    private let fullOrder: [MeetingTaskStatus] = [
+        .recorded, .uploadingRaw, .uploadedRaw, .transcoding, .transcoded, .uploading, .uploaded, .created, .polling, .completed
+    ]
+
     var body: some View {
         VStack(spacing: 32) {
             // Pipeline Steps
             HStack(spacing: 0) {
-                // Record Step (Not interactive for rerun)
-                StepView(title: "Record", icon: "mic.fill", isActive: false, isCompleted: true, isFailed: false)
-                
-                ArrowView()
-                
-                stepButton(title: "Upload Raw", icon: "arrow.up.doc.fill", step: .uploadingRaw)
-                ArrowView()
-                stepButton(title: "Transcode", icon: "waveform", step: .transcoding)
-                ArrowView()
-                stepButton(title: "Upload", icon: "icloud.and.arrow.up.fill", step: .uploading)
-                ArrowView()
-                stepButton(title: "Create Task", icon: "doc.badge.plus", step: .created)
-                ArrowView()
-                stepButton(title: "Poll", icon: "arrow.triangle.2.circlepath", step: .polling)
+                ForEach(Array(pipelineSteps.enumerated()), id: \.element.id) { index, step in
+                    stepButton(for: step)
+                    
+                    if index < pipelineSteps.count - 1 {
+                        ArrowView()
+                    }
+                }
             }
             .padding(.vertical, 20)
             .padding(.horizontal, 10)
@@ -99,20 +117,20 @@ struct PipelineView: View {
     // MARK: - Helpers
     
     @ViewBuilder
-    private func stepButton(title: String, icon: String, step: MeetingTaskStatus) -> some View {
-        let canRerun = manager.task.status == .completed || manager.task.status == .failed
+    private func stepButton(for descriptor: PipelineStepDescriptor) -> some View {
+        let canRerun = (manager.task.status == .completed || manager.task.status == .failed) && descriptor.isInteractive
         
         if canRerun {
             Button(action: {
-                stepToRerun = step
+                stepToRerun = descriptor.id
                 showRerunAlert = true
             }) {
                 StepView(
-                    title: title,
-                    icon: icon,
-                    isActive: isStepActive(step),
-                    isCompleted: isAfter(step),
-                    isFailed: isFailed(step)
+                    title: descriptor.title,
+                    icon: descriptor.icon,
+                    isActive: isStepActive(descriptor.id),
+                    isCompleted: descriptor.isAlwaysCompleted || isAfter(descriptor.id),
+                    isFailed: isFailed(descriptor.id)
                 )
                 .contentShape(Rectangle()) // Make sure the whole area is clickable
                 .overlay(
@@ -131,24 +149,17 @@ struct PipelineView: View {
             .help("Click to rerun this step")
         } else {
             StepView(
-                title: title,
-                icon: icon,
-                isActive: isStepActive(step),
-                isCompleted: isAfter(step),
-                isFailed: isFailed(step)
+                title: descriptor.title,
+                icon: descriptor.icon,
+                isActive: isStepActive(descriptor.id),
+                isCompleted: descriptor.isAlwaysCompleted || isAfter(descriptor.id),
+                isFailed: isFailed(descriptor.id)
             )
         }
     }
     
     private func stepTitle(_ step: MeetingTaskStatus) -> String {
-        switch step {
-        case .uploadingRaw: return "Upload Raw"
-        case .transcoding: return "Transcode"
-        case .uploading: return "Upload"
-        case .created: return "Create Task"
-        case .polling: return "Poll Status"
-        default: return step.rawValue
-        }
+        return pipelineSteps.first(where: { $0.id == step })?.title ?? step.rawValue
     }
 
     private func rerun(_ step: MeetingTaskStatus) {
@@ -174,8 +185,6 @@ struct PipelineView: View {
     }
     
     private func isAfter(_ status: MeetingTaskStatus) -> Bool {
-        let order: [MeetingTaskStatus] = [.recorded, .uploadingRaw, .uploadedRaw, .transcoding, .transcoded, .uploading, .uploaded, .created, .polling, .completed]
-        
         let currentStatus: MeetingTaskStatus
         if manager.task.status == .failed {
             if let failedStep = manager.task.failedStep {
@@ -190,8 +199,8 @@ struct PipelineView: View {
         // Special case: .created status means Create Task step is completed
         if currentStatus == .created && status == .created { return true }
         
-        guard let currentIndex = order.firstIndex(of: currentStatus),
-              let targetIndex = order.firstIndex(of: status) else { return false }
+        guard let currentIndex = fullOrder.firstIndex(of: currentStatus),
+              let targetIndex = fullOrder.firstIndex(of: status) else { return false }
         
         return currentIndex > targetIndex
     }
