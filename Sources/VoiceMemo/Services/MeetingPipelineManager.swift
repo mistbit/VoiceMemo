@@ -10,6 +10,11 @@ class MeetingPipelineManager: ObservableObject {
     private let tingwuService: TingwuService
     private let settings: SettingsStore
     
+    private struct PipelineConstants {
+        static let maxPollingRetries = 60
+        static let pollingInterval: UInt64 = 2 * 1_000_000_000
+    }
+    
     init(task: MeetingTask, settings: SettingsStore) {
         self.task = task
         self.settings = settings
@@ -33,8 +38,6 @@ class MeetingPipelineManager: ObservableObject {
         }
     }
     
-    // Legacy support for View buttons calling specific steps
-    // We map them to running the pipeline from that step
     func upload() async {
         if task.mode == .mixed {
             await runPipeline(from: .uploading, targetSpeaker: nil)
@@ -82,7 +85,6 @@ class MeetingPipelineManager: ObservableObject {
         } else {
             // Separated Mode
             if let spk = speaker {
-                // Retry specific speaker
                 let startStep: MeetingTaskStatus
                 if spk == 1 {
                     startStep = task.speaker1FailedStep ?? .recorded
@@ -90,11 +92,8 @@ class MeetingPipelineManager: ObservableObject {
                     startStep = task.speaker2FailedStep ?? .recorded
                 }
                 await runSingleTrack(from: startStep, speaker: spk)
-                
-                // After single track finishes, try alignment if both ready
                 await tryAlign()
             } else {
-                // Retry both (legacy behavior or generic retry button)
                 await runSeparatedPipeline()
             }
         }
@@ -102,7 +101,6 @@ class MeetingPipelineManager: ObservableObject {
     
     func restartFromBeginning() async {
         settings.log("Restart from beginning")
-        // Reset Task
         var resetTask = task
         resetTask.status = .recorded
         resetTask.originalOssUrl = nil
@@ -127,7 +125,7 @@ class MeetingPipelineManager: ObservableObject {
         await start()
     }
     
-    // MARK: - Pipeline Execution
+    // MARK: - Pipeline Orchestration
     
     private func runMixedPipeline() async {
         await runPipeline(from: .recorded, targetSpeaker: nil)
@@ -142,118 +140,251 @@ class MeetingPipelineManager: ObservableObject {
     }
     
     private func runSingleTrack(from startStep: MeetingTaskStatus, speaker: Int) async {
-        // If already completed, skip unless forced (not handled here for simplicity)
         if (speaker == 1 && task.speaker1Status == .completed && startStep != .polling) ||
            (speaker == 2 && task.speaker2Status == .completed && startStep != .polling) {
             return
         }
         
-        var nodes: [PipelineNode] = []
-        
-        // Build chain based on startStep
-        if startStep == .recorded || startStep == .failed {
-            nodes.append(UploadOriginalNode(targetSpeaker: speaker))
-        } else if startStep == .uploadingRaw {
-            nodes.append(UploadOriginalNode(targetSpeaker: speaker))
-        } else if startStep == .uploadedRaw || startStep == .transcoding {
-            nodes.append(TranscodeNode(targetSpeaker: speaker))
-        } else if startStep == .transcoded || startStep == .uploading {
-            nodes.append(UploadNode(targetSpeaker: speaker))
-        } else if startStep == .uploaded || startStep == .created {
-            nodes.append(CreateTaskNode(targetSpeaker: speaker))
-        } else if startStep == .polling {
-            nodes.append(PollingNode(targetSpeaker: speaker))
-        }
-        
+        let nodes = buildChain(from: startStep, channelId: speaker)
         await executeChain(nodes: nodes, speaker: speaker)
     }
     
     private func runPipeline(from startStep: MeetingTaskStatus, targetSpeaker: Int?) async {
-        var nodes: [PipelineNode] = []
-        
-        // Logic for mixed mode mainly
-        if startStep == .recorded || startStep == .failed {
-            nodes.append(UploadOriginalNode(targetSpeaker: targetSpeaker))
-        } else if startStep == .uploadingRaw {
-            nodes.append(UploadOriginalNode(targetSpeaker: targetSpeaker))
-        } else if startStep == .uploadedRaw || startStep == .transcoding {
-            nodes.append(TranscodeNode(targetSpeaker: targetSpeaker))
-        } else if startStep == .transcoded || startStep == .uploading {
-            nodes.append(UploadNode(targetSpeaker: targetSpeaker))
-        } else if startStep == .uploaded || startStep == .created {
-            nodes.append(CreateTaskNode(targetSpeaker: targetSpeaker))
-        } else if startStep == .polling {
-            nodes.append(PollingNode(targetSpeaker: targetSpeaker))
-        }
-        
+        let nodes = buildChain(from: startStep, channelId: targetSpeaker ?? 0)
         await executeChain(nodes: nodes, speaker: targetSpeaker)
     }
     
+    private func buildChain(from startStep: MeetingTaskStatus, channelId: Int) -> [PipelineNode] {
+        var nodes: [PipelineNode] = []
+        
+        if startStep == .recorded || startStep == .failed {
+            nodes.append(UploadOriginalNode(channelId: channelId))
+        } else if startStep == .uploadingRaw {
+            nodes.append(UploadOriginalNode(channelId: channelId))
+        } else if startStep == .uploadedRaw || startStep == .transcoding {
+            nodes.append(TranscodeNode(channelId: channelId))
+        } else if startStep == .transcoded || startStep == .uploading {
+            nodes.append(UploadNode(channelId: channelId))
+        } else if startStep == .uploaded || startStep == .created {
+            nodes.append(CreateTaskNode(channelId: channelId))
+        } else if startStep == .polling {
+            nodes.append(PollingNode(channelId: channelId))
+        }
+        
+        return nodes
+    }
+    
+    // MARK: - Board & Execution Logic
+    
     private func executeChain(nodes: [PipelineNode], speaker: Int?) async {
+        // 1. Hydrate Board from Task
+        let taskSnapshot = await MainActor.run { self.task }
+        var board = createBoard(from: taskSnapshot)
+        let services = ServiceProvider(ossService: ossService, tingwuService: tingwuService)
+        let channelId = speaker ?? 0
+        
         await MainActor.run { self.isProcessing = true }
         
         for node in nodes {
-            // 1. Update Status to Running
+            // Update UI status to "Running"
             await updateStatus(node.step, speaker: speaker, isFailed: false)
             
-            // 2. Run Node
             var success = false
             var retryCount = 0
-            let maxRetries = 60 // For polling
             
             while !success {
                 do {
-                    let context = PipelineContext(task: self.task, settings: self.settings, ossService: self.ossService, tingwuService: self.tingwuService)
-                    let updatedTask = try await node.run(context: context)
+                    // 2. Run Node (Pure execution on Board)
+                    try await node.run(board: &board, services: services)
                     
-                    await MainActor.run {
-                        self.task = updatedTask
-                        // Specific status updates for separated mode
-                        if let spk = speaker {
-                            if spk == 1 { self.task.speaker1Status = node.step == .polling ? .completed : node.step }
-                            else { self.task.speaker2Status = node.step == .polling ? .completed : node.step }
-                        }
-                    }
-                    
-                    let postStatus: MeetingTaskStatus? = {
-                        switch node.step {
-                        case .uploadingRaw: return .uploadedRaw
-                        case .transcoding: return .transcoded
-                        case .uploading: return .uploaded
-                        case .created: return .created
-                        case .polling, .recorded, .failed, .completed, .uploadedRaw, .transcoded, .uploaded: return nil
-                        }
-                    }()
-                    if let postStatus {
-                        await updateStatus(postStatus, speaker: speaker, isFailed: false)
-                    }
-                    
-                    self.save()
+                    // 3. Persist State (Sync Board back to Task)
+                    await persistState(from: board, channelId: channelId, completedStep: node.step)
                     success = true
                     
                 } catch {
+                    // Handle PipelineError with type safety
+                    if let pipelineError = error as? PipelineError {
+                        switch pipelineError {
+                        case .taskRunning:
+                            retryCount += 1
+                            if retryCount > PipelineConstants.maxPollingRetries {
+                                await updateStatus(.failed, speaker: speaker, step: node.step, error: "Polling timeout", isFailed: true)
+                                return
+                            }
+                            try? await Task.sleep(nanoseconds: PipelineConstants.pollingInterval)
+                            continue
+                        case .channelNotFound(let id):
+                            await updateStatus(.failed, speaker: speaker, step: node.step, error: "Channel \(id) not found", isFailed: true)
+                            return
+                        case .inputMissing(let msg):
+                            await updateStatus(.failed, speaker: speaker, step: node.step, error: "Input missing: \(msg)", isFailed: true)
+                            return
+                        case .transcodeFailed:
+                            await updateStatus(.failed, speaker: speaker, step: node.step, error: "Transcoding failed", isFailed: true)
+                            return
+                        case .cloudError(let msg):
+                            await updateStatus(.failed, speaker: speaker, step: node.step, error: "Cloud service error: \(msg)", isFailed: true)
+                            return
+                        case .taskFailed(let msg):
+                            await updateStatus(.failed, speaker: speaker, step: node.step, error: "Task failed: \(msg)", isFailed: true)
+                            return
+                        }
+                    }
+                    
+                    // Backward compatibility: handle non-PipelineError NSError
                     let nsError = error as NSError
-                    if nsError.code == 202 && node is PollingNode {
-                        // Polling: wait and retry
+                    if nsError.code == 202 {
                         retryCount += 1
-                        if retryCount > maxRetries {
+                        if retryCount > PipelineConstants.maxPollingRetries {
                             await updateStatus(.failed, speaker: speaker, step: node.step, error: "Polling timeout", isFailed: true)
                             return
                         }
-                        try? await Task.sleep(nanoseconds: 2 * 1_000_000_000) // 2s
+                        try? await Task.sleep(nanoseconds: PipelineConstants.pollingInterval)
                         continue
-                    } else {
-                        // Real failure
-                        await updateStatus(.failed, speaker: speaker, step: node.step, error: error.localizedDescription, isFailed: true)
-                        return
                     }
+                    
+                    // Unknown error
+                    await updateStatus(.failed, speaker: speaker, step: node.step, error: error.localizedDescription, isFailed: true)
+                    return
                 }
             }
         }
         
-        // Chain completed
         await MainActor.run { self.isProcessing = false }
     }
+    
+    // MARK: - Hydration & Persistence
+    
+    private func createBoard(from task: MeetingTask) -> PipelineBoard {
+        let config = PipelineBoard.Config(
+            ossPrefix: settings.ossPrefix,
+            tingwuAppKey: settings.tingwuAppKey,
+            enableSummarization: settings.enableSummary,
+            enableMeetingAssistance: settings.enableKeyPoints || settings.enableActionItems,
+            enableSpeakerDiarization: settings.enableRoleSplit,
+            speakerCount: settings.speakerCount
+        )
+        
+        var board = PipelineBoard(
+            recordingId: task.recordingId,
+            creationDate: task.createdAt,
+            mode: task.mode,
+            config: config
+        )
+        
+        // Hydrate Mixed Channel (0)
+        var mixed = ChannelData()
+        mixed.rawAudioPath = task.localFilePath
+        mixed.rawAudioOssURL = task.originalOssUrl
+        mixed.processedAudioOssURL = task.ossUrl
+        mixed.tingwuTaskId = task.tingwuTaskId
+        board.channels[0] = mixed
+        
+        // Hydrate Speaker Channels (Separated Mode)
+        // Note: In separated mode, Speaker 1 reuses the main MeetingTask fields
+        // (originalOssUrl, ossUrl, tingwuTaskId) for compatibility with mixed mode.
+        // Speaker 2 uses dedicated speaker2* fields.
+        if task.mode == .separated {
+            // Speaker 1 (Channel 1) - Reuses main MeetingTask fields
+            var spk1 = ChannelData()
+            spk1.rawAudioPath = task.speaker1AudioPath
+            spk1.rawAudioOssURL = task.originalOssUrl
+            spk1.processedAudioOssURL = task.ossUrl
+            spk1.tingwuTaskId = task.tingwuTaskId
+            spk1.failedStep = task.speaker1FailedStep
+            if let transcriptText = task.speaker1Transcript {
+                spk1.transcript = TingwuResult(text: transcriptText)
+            }
+            if task.speaker1Status == .failed {
+                spk1.lastError = task.lastError
+            }
+            board.channels[1] = spk1
+            
+            // Speaker 2 (Channel 2) - Uses dedicated speaker2* fields
+            var spk2 = ChannelData()
+            spk2.rawAudioPath = task.speaker2AudioPath
+            spk2.rawAudioOssURL = task.speaker2OriginalOssUrl
+            spk2.processedAudioOssURL = task.speaker2OssUrl
+            spk2.tingwuTaskId = task.speaker2TingwuTaskId
+            spk2.failedStep = task.speaker2FailedStep
+            if let transcriptText = task.speaker2Transcript {
+                spk2.transcript = TingwuResult(text: transcriptText)
+            }
+            if task.speaker2Status == .failed {
+                spk2.lastError = task.lastError
+            }
+            board.channels[2] = spk2
+        }
+        
+        return board
+    }
+    
+    private func persistState(from board: PipelineBoard, channelId: Int, completedStep: MeetingTaskStatus) async {
+        guard let channel = board.channels[channelId] else { return }
+        
+        await MainActor.run {
+            updateChannelFields(channelId: channelId, channel: channel)
+            updateChannelStatus(channelId: channelId, completedStep: completedStep)
+            self.errorMessage = nil
+            self.save()
+        }
+    }
+    
+    private func updateChannelFields(channelId: Int, channel: ChannelData) {
+        switch channelId {
+        case 0:
+            if let url = channel.rawAudioOssURL { self.task.originalOssUrl = url }
+            if let path = channel.processedAudioPath { self.task.localFilePath = path }
+            if let url = channel.processedAudioOssURL { self.task.ossUrl = url }
+            if let tid = channel.tingwuTaskId { self.task.tingwuTaskId = tid }
+            if let res = channel.transcript {
+                self.task.transcript = res.text
+                if let sum = res.summary { self.task.summary = sum }
+            }
+        case 1:
+            if let url = channel.rawAudioOssURL { self.task.originalOssUrl = url }
+            if let path = channel.processedAudioPath { self.task.speaker1AudioPath = path }
+            if let url = channel.processedAudioOssURL { self.task.ossUrl = url }
+            if let tid = channel.tingwuTaskId { self.task.tingwuTaskId = tid }
+            if let res = channel.transcript { self.task.speaker1Transcript = res.text }
+        case 2:
+            if let url = channel.rawAudioOssURL { self.task.speaker2OriginalOssUrl = url }
+            if let path = channel.processedAudioPath { self.task.speaker2AudioPath = path }
+            if let url = channel.processedAudioOssURL { self.task.speaker2OssUrl = url }
+            if let tid = channel.tingwuTaskId { self.task.speaker2TingwuTaskId = tid }
+            if let res = channel.transcript { self.task.speaker2Transcript = res.text }
+        default:
+            break
+        }
+    }
+    
+    private func updateChannelStatus(channelId: Int, completedStep: MeetingTaskStatus) {
+        let postStatus: MeetingTaskStatus? = {
+            switch completedStep {
+            case .uploadingRaw: return .uploadedRaw
+            case .transcoding: return .transcoded
+            case .uploading: return .uploaded
+            case .created: return .created
+            case .polling: return .completed
+            default: return nil
+            }
+        }()
+        
+        guard let status = postStatus else { return }
+        
+        switch channelId {
+        case 0:
+            self.task.status = status
+        case 1:
+            self.task.speaker1Status = status
+        case 2:
+            self.task.speaker2Status = status
+        default:
+            break
+        }
+    }
+    
+    // MARK: - Helpers
     
     private func updateStatus(_ status: MeetingTaskStatus, speaker: Int?, step: MeetingTaskStatus? = nil, error: String? = nil, isFailed: Bool = false) async {
         await MainActor.run {
@@ -266,7 +397,6 @@ class MeetingPipelineManager: ObservableObject {
                         self.task.speaker2Status = .failed
                         self.task.speaker2FailedStep = step
                     }
-                    // Global status update?
                     self.task.status = .failed
                 } else {
                     self.task.status = .failed
@@ -276,11 +406,9 @@ class MeetingPipelineManager: ObservableObject {
                 self.errorMessage = error
                 self.isProcessing = false
             } else {
-                // Running status
                 if let spk = speaker {
                     if spk == 1 { self.task.speaker1Status = status }
                     else { self.task.speaker2Status = status }
-                    // Update global status to something meaningful?
                     if self.task.status != .polling { self.task.status = status }
                 } else {
                     self.task.status = status
@@ -292,8 +420,6 @@ class MeetingPipelineManager: ObservableObject {
     }
     
     private func tryAlign() async {
-        // Only if both are done (or one done one failed?)
-        // For now, simple merge if both have content
         await MainActor.run {
             let t1 = self.task.speaker1Transcript ?? ""
             let t2 = self.task.speaker2Transcript ?? ""
@@ -309,57 +435,16 @@ class MeetingPipelineManager: ObservableObject {
         }
     }
     
+    // MARK: - Legacy Support for Tests
+    
     func buildTranscriptText(from transcriptionData: [String: Any]) -> String {
-        func build(from data: [String: Any]) -> String? {
-            if let result = data["Result"] as? [String: Any],
-               let transcription = result["Transcription"] as? [String: Any] {
-                return build(from: transcription)
-            }
-            if let transcription = data["Transcription"] as? [String: Any] {
-                return build(from: transcription)
-            }
-            if let paragraphs = data["Paragraphs"] as? [[String: Any]] {
-                return paragraphs.compactMap { extractLine(from: $0) }.joined(separator: "\n")
-            }
-            if let sentences = data["Sentences"] as? [[String: Any]] {
-                return sentences.compactMap { extractLine(from: $0) }.joined(separator: "\n")
-            }
-            if let transcript = data["Transcript"] as? String {
-                return transcript
-            }
-            return nil
-        }
-        
-        func extractLine(from item: [String: Any]) -> String? {
-            let speaker = extractSpeaker(from: item)
-            let text = extractText(from: item)
-            guard !text.isEmpty else { return nil }
-            if let speaker {
-                return "\(speaker): \(text)"
-            }
-            return text
-        }
-        
-        func extractText(from item: [String: Any]) -> String {
-            if let text = item["Text"] as? String, !text.isEmpty { return text }
-            if let text = item["text"] as? String, !text.isEmpty { return text }
-            if let words = item["Words"] as? [[String: Any]] {
-                return words.compactMap { $0["Text"] as? String ?? $0["text"] as? String }.joined()
-            }
-            return ""
-        }
-        
-        func extractSpeaker(from item: [String: Any]) -> String? {
-            if let name = item["SpeakerName"] as? String, !name.isEmpty { return name }
-            if let name = item["Speaker"] as? String, !name.isEmpty { return name }
-            if let id = item["SpeakerId"] ?? item["SpeakerID"] { return "Speaker \(id)" }
-            return nil
-        }
-        
-        return build(from: transcriptionData) ?? ""
+        return TranscriptParser.buildTranscriptText(from: transcriptionData) ?? ""
     }
-
+    
     private func save() {
-        Task { try? await StorageManager.shared.currentProvider.saveTask(self.task) }
+        Task { @MainActor in
+            let snapshot = self.task
+            try? await StorageManager.shared.currentProvider.saveTask(snapshot)
+        }
     }
 }

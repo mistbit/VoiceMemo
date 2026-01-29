@@ -23,7 +23,9 @@
     - `TingwuService.swift`：创建听悟离线任务 + 查询任务信息。
     - `MeetingPipelineManager.swift`：流水线编排器（State Machine），负责调度具体的 PipelineNode。
     - `Pipeline/`
+      - `PipelineBoard.swift`：流水线执行上下文（黑板），管理状态传递与多路数据。
       - `PipelineNodes.swift`：具体的流水线节点实现（Upload, Transcode, CreateTask, Polling）。
+      - `TranscriptParser.swift`：听悟转写结果解析器。
     - `Storage/StorageProvider.swift`：存储抽象接口。
     - `Storage/SQLiteStorage.swift`：本地 SQLite 任务持久化。
     - `Storage/MySQLStorage.swift`：MySQL 任务持久化。

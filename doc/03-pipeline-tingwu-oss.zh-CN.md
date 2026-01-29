@@ -8,7 +8,9 @@
 
 - `Sources/VoiceMemo/Views/PipelineView.swift`
 - `Sources/VoiceMemo/Services/MeetingPipelineManager.swift`
+- `Sources/VoiceMemo/Services/Pipeline/PipelineBoard.swift`
 - `Sources/VoiceMemo/Services/Pipeline/PipelineNodes.swift`
+- `Sources/VoiceMemo/Services/Pipeline/TranscriptParser.swift`
 - `Sources/VoiceMemo/Services/OSSService.swift`
 - `Sources/VoiceMemo/Services/TingwuService.swift`
 
@@ -18,10 +20,11 @@
 
 - **`MeetingPipelineManager`**：同时支持“混合模式”和“分离模式”。具体行为由 `MeetingTask.mode` 决定（例如：单文件 vs 双文件的上传/创建/轮询）。
 
-内部实现使用了**策略模式**来编排节点：
+内部实现使用了**PipelineBoard（黑板模式）**来编排节点：
 
-- `PipelineNode`（协议，定义 `run(context:)`）
-- `PipelineContext`（task + services + settings）
+- **`PipelineBoard`**：纯内存、强类型的数据结构，用于在节点间传递状态和产物（如路径、URL、TaskID）。它解耦了 Node 与 DB Model (`MeetingTask`)。
+- **`PipelineNode`**：协议，定义 `run(board:services:)`。Node 只负责执行业务逻辑并更新 Board，不直接修改 Task。
+- **Hydration/Persistence**：`MeetingPipelineManager` 负责在流水线开始前将 `MeetingTask` 转换为 `PipelineBoard`（Hydration），并在每个节点执行后将 Board 的状态同步回 `MeetingTask`（Persistence）。
 - 具体的 Node 类（如 `TranscodeNode`, `UploadNode`）定义在 `PipelineNodes.swift` 中。
 
 这样 `PipelineView` 仍可以通过 `transcode()` / `upload()` / `createTask()` / `pollStatus()` 触发，但底层会映射为“从某个 step 开始跑完整链路”。
@@ -104,8 +107,8 @@
 - 当状态为 `SUCCESS` / `COMPLETED`：
   - 将 `Data` 对象（pretty JSON）保存到 `task.rawResponse`
   - 解析：
-    - 转写文本：
-      - `Result.Transcription` URL → 拉取 JSON → 解析 `Paragraphs`/`Sentences`
+    - 使用 **`TranscriptParser`** 统一处理转写结果解析。
+    - 转写文本：`Result.Transcription` URL → 拉取 JSON → `TranscriptParser` 解析为文本。
     - 总结/重点/行动项：
       - `Result.Summarization` URL 或内联对象
       - `Result.MeetingAssistance` URL 或内联对象

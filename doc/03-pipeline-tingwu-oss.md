@@ -8,6 +8,9 @@ Document the manual pipeline executed from the UI after a recording is saved (or
 
 - `Sources/VoiceMemo/Views/PipelineView.swift`
 - `Sources/VoiceMemo/Services/MeetingPipelineManager.swift`
+- `Sources/VoiceMemo/Services/Pipeline/PipelineBoard.swift`
+- `Sources/VoiceMemo/Services/Pipeline/PipelineNodes.swift`
+- `Sources/VoiceMemo/Services/Pipeline/TranscriptParser.swift`
 - `Sources/VoiceMemo/Services/OSSService.swift`
 - `Sources/VoiceMemo/Services/TingwuService.swift`
 
@@ -17,10 +20,12 @@ The app uses a single pipeline manager:
 
 - **`MeetingPipelineManager`**: Handles both "Mixed" and "Separated" mode tasks. Mode-specific behavior is selected via `MeetingTask.mode` (e.g. upload/create/poll for one file vs two files).
 
-Internally, `MeetingPipelineManager` runs the pipeline via a small node abstraction:
+Internally, `MeetingPipelineManager` uses a **PipelineBoard (Blackboard Pattern)** to orchestrate nodes:
 
-- `PipelineNode` (step-based execution)
-- `PipelineContext` (task + services + settings)
+- **`PipelineBoard`**: A pure in-memory, strongly-typed data structure used to pass state and artifacts (e.g., paths, URLs, TaskIDs) between nodes. It decouples Nodes from the DB Model (`MeetingTask`).
+- **`PipelineNode`**: A protocol defining `run(board:services:)`. Nodes are only responsible for executing business logic and updating the Board, not modifying the Task directly.
+- **Hydration/Persistence**: `MeetingPipelineManager` handles converting `MeetingTask` to `PipelineBoard` (Hydration) before the pipeline starts, and syncing the Board's state back to `MeetingTask` (Persistence) after each node executes.
+- Concrete Node classes (e.g. `TranscodeNode`, `UploadNode`) are defined in `PipelineNodes.swift`.
 
 This keeps the UI-facing API stable (e.g. `transcode()`, `upload()`) while allowing the implementation to be composed and resumed from any step.
 
@@ -102,8 +107,8 @@ On success:
 - On `SUCCESS` / `COMPLETED`:
   - Persists raw `Data` object (pretty JSON) into `task.rawResponse`
   - Extracts:
-    - Transcript:
-      - `Result.Transcription` URL → fetch JSON → `Paragraphs`/`Sentences`
+    - Uses **`TranscriptParser`** to unify transcript result parsing.
+    - Transcript: `Result.Transcription` URL → fetch JSON → `TranscriptParser` parses to text.
     - Summary / key points / action items:
       - `Result.Summarization` URL or inline object
       - `Result.MeetingAssistance` URL or inline object

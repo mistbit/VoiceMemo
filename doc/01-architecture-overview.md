@@ -22,6 +22,10 @@ This document explains how the app is structured end-to-end: UI, recording, pipe
     - `OSSService.swift`: upload audio to OSS.
     - `TingwuService.swift`: create Tingwu offline task + poll task info.
     - `MeetingPipelineManager.swift`: pipeline manager (orchestrates transcode/upload/create/poll and persistence).
+    - `Pipeline/`
+      - `PipelineBoard.swift`: in-memory execution board (blackboard) for node state.
+      - `PipelineNodes.swift`: pipeline node implementations (Upload, Transcode, CreateTask, Polling).
+      - `TranscriptParser.swift`: transcript parsing utilities for Tingwu results.
     - `Storage/StorageProvider.swift`: storage abstraction used by the pipeline.
     - `Storage/SQLiteStorage.swift`: local SQLite persistence for task history.
     - `Storage/MySQLStorage.swift`: MySQL persistence for task history.

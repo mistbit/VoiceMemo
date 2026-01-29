@@ -60,7 +60,8 @@ flowchart TD
 ### 现有相关入口
 
 - 录音与混合输出：`Sources/VoiceMemo/AudioRecorder.swift`
-- 混合流水线：`Sources/VoiceMemo/Services/MeetingPipelineManager.swift`
+- 流水线管理：`Sources/VoiceMemo/Services/MeetingPipelineManager.swift`
+- 流水线上下文：`Sources/VoiceMemo/Services/Pipeline/PipelineBoard.swift` (新增)
 - 任务模型：`Sources/VoiceMemo/Models/MeetingTask.swift`
 - 设置与特性开关：`Sources/VoiceMemo/Services/SettingsStore.swift`
 - 结果展示与导出：`Sources/VoiceMemo/Views/ResultView.swift`
@@ -96,7 +97,9 @@ flowchart TD
    - 通道映射为固定策略，无需额外配置。
 
 2. 分路识别
+   - 利用 `PipelineBoard` 的多通道设计（Channel 1 & 2）。
    - speaker1 与 speaker2 两条 pipeline 并行执行（每路独立跑 Upload Raw → Transcode → Upload (Mixed) → CreateTask → Poll）。
+   - 节点逻辑无状态化，通过传入的 `channelId` 操作 Board 上对应的数据。
 
 3. 结果落地
    - 单路成功立即写入对应 transcript。

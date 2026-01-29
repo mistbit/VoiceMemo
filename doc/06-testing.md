@@ -15,12 +15,16 @@ Test files:
 - `Tests/VoiceMemoTests/TingwuSignatureTests.swift`
 - `Tests/VoiceMemoTests/TingwuCreateTaskTests.swift`
 - `Tests/VoiceMemoTests/OSSUploadTests.swift`
+- `Tests/VoiceMemoTests/PipelineBoardTests.swift`
+- `Tests/VoiceMemoTests/TranscriptParserTests.swift`
 
 ## What Is Covered
 
 - Tingwu request signing canonicalization and hash validation.
 - Tingwu create task request body construction (feature toggles).
 - OSS upload connectivity (requires real credentials).
+- PipelineBoard behavior (channel updates, date path formatting).
+- TranscriptParser parsing behavior across Tingwu result shapes.
 
 ## Running Tests
 
@@ -46,4 +50,3 @@ Recommended workflow:
 
 - Keep placeholders in Git.
 - During local testing, temporarily fill values, run tests, then revert the file before committing.
-
