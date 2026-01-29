@@ -8,6 +8,7 @@
 
 - `Sources/VoiceMemo/Views/PipelineView.swift`
 - `Sources/VoiceMemo/Services/MeetingPipelineManager.swift`
+- `Sources/VoiceMemo/Services/Pipeline/PipelineNodes.swift`
 - `Sources/VoiceMemo/Services/OSSService.swift`
 - `Sources/VoiceMemo/Services/TingwuService.swift`
 
@@ -17,10 +18,11 @@
 
 - **`MeetingPipelineManager`**：同时支持“混合模式”和“分离模式”。具体行为由 `MeetingTask.mode` 决定（例如：单文件 vs 双文件的上传/创建/轮询）。
 
-内部实现使用了简单的节点抽象来编排与续跑：
+内部实现使用了**策略模式**来编排节点：
 
-- `PipelineNode`（按 step 执行）
+- `PipelineNode`（协议，定义 `run(context:)`）
 - `PipelineContext`（task + services + settings）
+- 具体的 Node 类（如 `TranscodeNode`, `UploadNode`）定义在 `PipelineNodes.swift` 中。
 
 这样 `PipelineView` 仍可以通过 `transcode()` / `upload()` / `createTask()` / `pollStatus()` 触发，但底层会映射为“从某个 step 开始跑完整链路”。
 

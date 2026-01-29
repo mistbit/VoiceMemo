@@ -13,6 +13,10 @@ struct ContentView: View {
     @State private var selectedSettingsCategory: SettingsCategory? = .general
     @State private var selectedTask: MeetingTask?
     
+    // Import State
+    @State private var isImporting = false
+    @State private var importError: String?
+    
     init(settings: SettingsStore) {
         self.settings = settings
         _recorder = StateObject(wrappedValue: AudioRecorder(settings: settings))
@@ -73,7 +77,7 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 400)
         } detail: {
-        if let item = selectedSidebarItem {
+            if let item = selectedSidebarItem {
                 switch item {
                 case .recording:
                     if let mode = selectedRecordingMode {
@@ -93,8 +97,17 @@ struct ContentView: View {
                     if let mode = selectedImportMode {
                         switch mode {
                         case .file:
-                            ImportView { mode, files in
-                                handleImport(mode: mode, files: files)
+                            if isImporting {
+                                VStack(spacing: 16) {
+                                    ProgressView()
+                                        .scaleEffect(1.5)
+                                    Text("Importing...")
+                                        .foregroundColor(.secondary)
+                                }
+                            } else {
+                                ImportView { mode, files in
+                                    handleImport(mode: mode, files: files)
+                                }
                             }
                         }
                     } else {
@@ -128,27 +141,36 @@ struct ContentView: View {
         .onChange(of: recorder.latestTask?.id) { _ in
             Task { await historyStore.refresh() }
         }
-    }
-    
-    private func handleImport(mode: MeetingMode, files: [URL]) {
-        Task {
-            do {
-                let newTask = try await storeImport(mode: mode, files: files)
-                await MainActor.run {
-                    self.selectedSidebarItem = .history
-                    // Small delay to let the UI switch before selecting the task
-                    // Ideally we should wait for the view to update, but this is a simple heuristic
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        self.selectedTask = newTask
-                    }
-                }
-            } catch {
-                print("Import failed: \(error)")
+        .alert("Import Failed", isPresented: Binding(
+            get: { importError != nil },
+            set: { if !$0 { importError = nil } }
+        )) {
+            Button("OK") { }
+        } message: {
+            if let error = importError {
+                Text(error)
             }
         }
     }
     
-    private func storeImport(mode: MeetingMode, files: [URL]) async throws -> MeetingTask {
-        return try await historyStore.importTask(mode: mode, files: files)
+    private func handleImport(mode: MeetingMode, files: [URL]) {
+        isImporting = true
+        importError = nil
+        
+        Task {
+            do {
+                let newTask = try await historyStore.importTask(mode: mode, files: files)
+                await MainActor.run {
+                    isImporting = false
+                    selectedSidebarItem = .history
+                    selectedTask = newTask
+                }
+            } catch {
+                await MainActor.run {
+                    isImporting = false
+                    importError = error.localizedDescription
+                }
+            }
+        }
     }
 }
