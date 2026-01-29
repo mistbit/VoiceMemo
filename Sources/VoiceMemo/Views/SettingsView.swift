@@ -323,12 +323,13 @@ struct SettingsView: View {
             GroupBox(label: Text("Storage Type").bold()) {
                 VStack(spacing: 12) {
                     FormRow(label: "Type") {
+                        Spacer()
                         Picker("", selection: $settings.storageType) {
                             Text("Local (SQLite)").tag(SettingsStore.StorageType.local)
                             Text("MySQL").tag(SettingsStore.StorageType.mysql)
                         }
                         .labelsHidden()
-                        .frame(maxWidth: 200)
+                        .frame(width: 200)
                     }
                 }
                 .padding(8)
