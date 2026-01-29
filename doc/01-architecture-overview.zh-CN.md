@@ -21,7 +21,9 @@
     - `KeychainHelper.swift`：Keychain 密钥存储（RAM AK/Secret）。
     - `OSSService.swift`：上传音频到 OSS。
     - `TingwuService.swift`：创建听悟离线任务 + 查询任务信息。
-    - `MeetingPipelineManager.swift`：流水线管理器（串联转码/上传/创建/轮询并写入存储）。
+    - `MeetingPipelineManager.swift`：流水线编排器（State Machine），负责调度具体的 PipelineNode。
+    - `Pipeline/`
+      - `PipelineNodes.swift`：具体的流水线节点实现（Upload, Transcode, CreateTask, Polling）。
     - `Storage/StorageProvider.swift`：存储抽象接口。
     - `Storage/SQLiteStorage.swift`：本地 SQLite 任务持久化。
     - `Storage/MySQLStorage.swift`：MySQL 任务持久化。
