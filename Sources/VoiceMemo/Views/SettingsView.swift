@@ -152,25 +152,6 @@ struct SettingsView: View {
         }
     }
     
-    private struct ToggleRow: View {
-        let icon: String
-        let title: String
-        @Binding var isOn: Bool
-        
-        var body: some View {
-            HStack {
-                Image(systemName: icon)
-                    .frame(width: 20)
-                    .foregroundColor(.blue)
-                Text(title)
-                Spacer()
-                Toggle("", isOn: $isOn)
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-            }
-        }
-    }
-    
     // MARK: - Forms
     
     private var generalForm: some View {
@@ -196,16 +177,23 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                         .padding(.leading, 8)
                 }
-                
-                Divider()
-                
-                // AI Features Group
-                FormRow(label: "AI Analysis") {
-                    VStack(spacing: 10) {
-                        ToggleRow(icon: "doc.text", title: "Summary", isOn: $settings.enableSummary)
-                        ToggleRow(icon: "list.bullet.rectangle", title: "Key Points", isOn: $settings.enableKeyPoints)
-                        ToggleRow(icon: "checkmark.square", title: "Action Items", isOn: $settings.enableActionItems)
-                    }
+            }
+            
+            StyledGroupBox("AI Analysis") {
+                FormRow(label: "Summary") {
+                    Toggle("", isOn: $settings.enableSummary)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                }
+                FormRow(label: "Key Points") {
+                    Toggle("", isOn: $settings.enableKeyPoints)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                }
+                FormRow(label: "Action Items") {
+                    Toggle("", isOn: $settings.enableActionItems)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
                 }
             }
 
