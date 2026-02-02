@@ -3,50 +3,100 @@ import Combine
 
 class HistoryStore: ObservableObject {
     @Published var tasks: [MeetingTask] = []
+    @Published var isLoading = false
+    @Published var error: Error?
+    @Published var lastRefreshDate: Date?
+    
+    private var cancellables = Set<AnyCancellable>()
+    private var notificationObserver: NSObjectProtocol?
     
     init() {
+        // 使用传统的NotificationCenter监听方式
+        notificationObserver = NotificationCenter.default.addObserver(
+            forName: .meetingTaskDidUpdate,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            print("HistoryStore received meetingTaskDidUpdate notification: \(notification.object ?? "nil")")
+            Task { await self.refresh() }
+        }
+        
         Task { await refresh() }
+    }
+    
+    deinit {
+        if let observer = notificationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
     @MainActor
     func refresh() async {
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+        
         do {
             tasks = try await StorageManager.shared.currentProvider.fetchTasks()
+            lastRefreshDate = Date()
+            print("HistoryStore refreshed successfully with \(tasks.count) tasks")
         } catch {
+            self.error = error
             print("HistoryStore refresh error: \(error)")
         }
     }
     
     func deleteTask(at offsets: IndexSet) {
         let tasksToDelete = offsets.map { tasks[$0] }
-        Task {
-            for task in tasksToDelete {
-                try? await StorageManager.shared.currentProvider.deleteTask(id: task.id)
+        Task { @MainActor in
+            do {
+                for task in tasksToDelete {
+                    try await StorageManager.shared.currentProvider.deleteTask(id: task.id)
+                }
+                await refresh()
+            } catch {
+                self.error = error
+                print("HistoryStore delete error: \(error)")
             }
-            await refresh()
         }
     }
 
     func deleteTask(_ task: MeetingTask) {
-        Task {
-            try? await StorageManager.shared.currentProvider.deleteTask(id: task.id)
-            await refresh()
+        Task { @MainActor in
+            do {
+                try await StorageManager.shared.currentProvider.deleteTask(id: task.id)
+                await refresh()
+            } catch {
+                self.error = error
+                print("HistoryStore delete error: \(error)")
+            }
         }
     }
 
     func deleteTasks(_ tasks: [MeetingTask]) {
-        Task {
-            for task in tasks {
-                try? await StorageManager.shared.currentProvider.deleteTask(id: task.id)
+        Task { @MainActor in
+            do {
+                for task in tasks {
+                    try await StorageManager.shared.currentProvider.deleteTask(id: task.id)
+                }
+                await refresh()
+            } catch {
+                self.error = error
+                print("HistoryStore delete error: \(error)")
             }
-            await refresh()
         }
     }
 
     func updateTitle(for task: MeetingTask, newTitle: String) {
-        Task {
-            try? await StorageManager.shared.currentProvider.updateTaskTitle(id: task.id, newTitle: newTitle)
-            await refresh()
+        Task { @MainActor in
+            do {
+                try await StorageManager.shared.currentProvider.updateTaskTitle(id: task.id, newTitle: newTitle)
+                await refresh()
+            } catch {
+                self.error = error
+                print("HistoryStore update title error: \(error)")
+            }
         }
     }
     

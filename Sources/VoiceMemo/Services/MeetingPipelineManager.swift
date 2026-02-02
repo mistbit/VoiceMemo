@@ -548,7 +548,10 @@ class MeetingPipelineManager: ObservableObject {
     
     private func save() async {
         let snapshot = await MainActor.run { self.task }
+        print("MeetingPipelineManager save() called with task: \(snapshot.id), status: \(snapshot.status)")
         try? await StorageManager.shared.currentProvider.saveTask(snapshot)
+        print("MeetingPipelineManager posting notification for task: \(snapshot.id)")
         NotificationCenter.default.post(name: .meetingTaskDidUpdate, object: snapshot.id, userInfo: [MeetingTask.userInfoTaskKey: snapshot])
+        print("MeetingPipelineManager notification posted")
     }
 }
