@@ -387,6 +387,11 @@ class MeetingPipelineManager: ObservableObject {
                 self.task.transcript = res.text
                 if let sum = res.summary { self.task.summary = sum }
             }
+            // Save complete poll results to database
+            if let overview = channel.overviewData { self.task.overviewData = overview }
+            if let transcript = channel.transcriptData { self.task.transcriptData = transcript }
+            if let conversation = channel.conversationData { self.task.conversationData = conversation }
+            if let raw = channel.rawData { self.task.rawData = raw }
         case 1:
             if let url = channel.rawAudioOssURL { self.task.originalOssUrl = url }
             if let path = channel.processedAudioPath { self.task.speaker1AudioPath = path }
