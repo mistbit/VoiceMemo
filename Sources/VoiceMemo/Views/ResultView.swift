@@ -97,7 +97,7 @@ struct ResultView: View {
                     TranscriptView(text: derivedTranscript() ?? "No transcript available.")
                 case .raw:
                     ScrollView {
-                        Text(task.rawResponse ?? "No raw response.")
+                        Text(task.rawData ?? task.rawResponse ?? "No raw response.")
                             .font(.monospaced(.body)())
                             .padding(24)
                             .textSelection(.enabled)
@@ -160,6 +160,16 @@ struct ResultView: View {
         if let transcript = task.transcript, !transcript.isEmpty {
             return transcript
         }
+        
+        // Try to parse from transcriptData (full JSON from DB)
+        if let dataStr = task.transcriptData,
+           let data = dataStr.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let text = TranscriptParser.buildTranscriptText(from: json) {
+                return text
+            }
+        }
+        
         guard let raw = task.rawResponse,
               let data = raw.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

@@ -261,15 +261,29 @@ class PollingNode: PipelineNode {
     
     // New helper methods for complete data storage
     private func fetchOverviewData(from result: [String: Any], service: TingwuService) async -> String? {
+        var combinedData: [String: Any] = [:]
+        
         // Try to fetch summarization data
         if let summarizationUrl = result["Summarization"] as? String {
             if let data = try? await service.fetchJSON(url: summarizationUrl) {
-                if let jsonData = try? JSONSerialization.data(withJSONObject: data),
-                   let jsonString = String(data: jsonData, encoding: .utf8) {
-                    return jsonString
-                }
+                combinedData.merge(data) { (_, new) in new }
             }
         }
+        
+        // Try to fetch meeting assistance data
+        if let assistanceUrl = result["MeetingAssistance"] as? String {
+            if let data = try? await service.fetchJSON(url: assistanceUrl) {
+                combinedData.merge(data) { (_, new) in new }
+            }
+        }
+        
+        if !combinedData.isEmpty {
+            if let jsonData = try? JSONSerialization.data(withJSONObject: combinedData),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                return jsonString
+            }
+        }
+        
         return nil
     }
     
