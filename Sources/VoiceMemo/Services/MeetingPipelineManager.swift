@@ -247,7 +247,48 @@ class MeetingPipelineManager: ObservableObject {
             if let sum = res.summary { self.task.summary = sum }
         }
         // Save complete poll results to database
-        if let overview = channel.overviewData { self.task.overviewData = overview }
+        if let overview = channel.overviewData {
+            self.task.overviewData = overview
+            
+            // Extract metadata from overview data
+            if let data = overview.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                
+                // 1. Summary (Fallback if not in result)
+                if self.task.summary == nil,
+                   let summaryObj = json["Summarization"] as? [String: Any],
+                   let text = summaryObj["ParagraphSummary"] as? String {
+                    self.task.summary = text
+                }
+                
+                // 2. Meeting Assistance
+                if let assistance = json["MeetingAssistance"] as? [String: Any] {
+                    // Key Points
+                    if self.task.keyPoints == nil,
+                       let keyInfo = assistance["KeyInformation"] as? [[String: Any]] {
+                        let text = keyInfo.compactMap { item -> String? in
+                            let key = item["Key"] as? String ?? item["Name"] as? String
+                            let value = item["Value"] as? String ?? item["Content"] as? String
+                            if let k = key, let v = value { return "- **\(k)**: \(v)" }
+                            if let v = value { return "- \(v)" }
+                            return nil
+                        }.joined(separator: "\n")
+                        if !text.isEmpty { self.task.keyPoints = text }
+                    }
+                    
+                    // Action Items
+                    if self.task.actionItems == nil,
+                       let actions = assistance["Actions"] as? [[String: Any]] {
+                        let text = actions.compactMap { item -> String? in
+                            let desc = item["Description"] as? String ?? item["Content"] as? String
+                            if let d = desc { return "- [ ] \(d)" }
+                            return nil
+                        }.joined(separator: "\n")
+                        if !text.isEmpty { self.task.actionItems = text }
+                    }
+                }
+            }
+        }
         if let transcript = channel.transcriptData { self.task.transcriptData = transcript }
         if let conversation = channel.conversationData { self.task.conversationData = conversation }
         if let raw = channel.rawData { self.task.rawData = raw }
