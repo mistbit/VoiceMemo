@@ -222,26 +222,38 @@ struct ResultView: View {
     }
     
     private static func computeTranscript(task: MeetingTask) -> String? {
+        let startTime = Date()
+        defer {
+            NSLog("Transcript computation took: \(Date().timeIntervalSince(startTime))s")
+        }
+        
         if let transcript = task.transcript, !transcript.isEmpty {
+            NSLog("Transcript source: direct 'transcript' field (length: \(transcript.count))")
             return transcript
         }
         
         // Try to parse from transcriptData (full JSON from DB)
-        if let dataStr = task.transcriptData,
-           let data = dataStr.data(using: .utf8),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let text = TranscriptParser.buildTranscriptText(from: json) {
-                return text
+        if let dataStr = task.transcriptData {
+            NSLog("Transcript source: parsing 'transcriptData' JSON (length: \(dataStr.count))")
+            if let data = dataStr.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if let text = TranscriptParser.buildTranscriptText(from: json) {
+                    return text
+                }
             }
         }
         
-        guard let raw = task.rawResponse,
-              let data = raw.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
+        if let raw = task.rawResponse {
+            NSLog("Transcript source: parsing 'rawResponse' JSON (length: \(raw.count))")
+            guard let data = raw.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return nil
+            }
+            return TranscriptParser.buildTranscriptText(from: json)
         }
         
-        return TranscriptParser.buildTranscriptText(from: json)
+        NSLog("Transcript source: None found")
+        return nil
     }
 }
 
