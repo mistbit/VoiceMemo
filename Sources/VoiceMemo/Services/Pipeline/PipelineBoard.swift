@@ -7,7 +7,6 @@ struct PipelineBoard {
     // --- 基础信息 ---
     let recordingId: String
     let creationDate: Date
-    let mode: MeetingMode
     
     // --- 配置 (Configuration) ---
     struct Config {
@@ -22,8 +21,6 @@ struct PipelineBoard {
     
     // --- 多路数据 (Channels) ---
     // 0: Mixed Mode (默认)
-    // 1: Speaker 1 (Separated Mode)
-    // 2: Speaker 2 (Separated Mode)
     var channels: [Int: ChannelData] = [:]
     
     // --- 辅助方法 ---

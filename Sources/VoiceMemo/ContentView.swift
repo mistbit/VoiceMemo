@@ -8,7 +8,7 @@ struct ContentView: View {
     
     // Navigation State
     @State private var selectedSidebarItem: SidebarItem? = .history
-    @State private var selectedRecordingMode: RecordingModeItem?
+    @State private var selectedRecordingMode: RecordingModeItem? = .mixed
     @State private var selectedImportMode: ImportModeItem?
     @State private var selectedSettingsCategory: SettingsCategory? = .general
     @State private var selectedTask: MeetingTask?
@@ -54,7 +54,7 @@ struct ContentView: View {
                                 .padding(.vertical, 4)
                             }
                         }
-                        .navigationTitle("New Recording")
+                        .navigationTitle("Recording")
                         
                     case .importAudio:
                         List(ImportModeItem.allCases, selection: $selectedImportMode) { mode in
@@ -98,22 +98,11 @@ struct ContentView: View {
             if let item = selectedSidebarItem {
                 switch item {
                 case .recording:
-                    if let mode = selectedRecordingMode {
-                        RecordingView(recorder: recorder, settings: settings, showModeSelection: false, onViewResult: {
-                            if let task = recorder.latestTask {
-                                navigateToTask(task)
-                            }
-                        })
-                            .onAppear {
-                                recorder.recordingMode = mode.mode
-                            }
-                            .onChange(of: mode) { newMode in
-                                recorder.recordingMode = newMode.mode
-                            }
-                    } else {
-                        Text("Select a recording mode")
-                            .foregroundColor(.secondary)
-                    }
+                    RecordingView(recorder: recorder, settings: settings, onViewResult: {
+                        if let task = recorder.latestTask {
+                            navigateToTask(task)
+                        }
+                    })
                     
                 case .importAudio:
                     if let mode = selectedImportMode {
@@ -127,8 +116,8 @@ struct ContentView: View {
                                         .foregroundColor(.secondary)
                                 }
                             } else {
-                                ImportView { mode, files in
-                                    handleImport(mode: mode, files: files)
+                                ImportView { files in
+                                    handleImport(files: files)
                                 }
                             }
                         }
@@ -175,13 +164,13 @@ struct ContentView: View {
         }
     }
     
-    private func handleImport(mode: MeetingMode, files: [URL]) {
+    private func handleImport(files: [URL]) {
         isImporting = true
         importError = nil
         
         Task {
             do {
-                let newTask = try await historyStore.importTask(mode: mode, files: files)
+                let newTask = try await historyStore.importTask(files: files)
                 await MainActor.run {
                     isImporting = false
                     selectedSidebarItem = .history
