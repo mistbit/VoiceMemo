@@ -9,12 +9,8 @@ struct PipelineView: View {
     @State private var stepToRerun: MeetingTaskStatus?
     @State private var showRerunAlert = false
     
-    // Callback for navigation
-    var onViewResult: (() -> Void)?
-    
-    init(task: MeetingTask, settings: SettingsStore, onViewResult: (() -> Void)? = nil) {
+    init(task: MeetingTask, settings: SettingsStore) {
         self.settings = settings
-        self.onViewResult = onViewResult
         _manager = StateObject(wrappedValue: MeetingPipelineManager(task: task, settings: settings))
     }
     
@@ -73,11 +69,7 @@ struct PipelineView: View {
             
             if manager.task.status == .completed {
                 Button(action: {
-                    if let callback = onViewResult {
-                        callback()
-                    } else {
-                        showingResult = true
-                    }
+                    showingResult = true
                 }) {
                     HStack {
                         Text("View Result")
@@ -91,6 +83,9 @@ struct PipelineView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity)
+        .sheet(isPresented: $showingResult) {
+            ResultView(task: manager.task, settings: settings)
+        }
         .alert("Rerun Step?", isPresented: $showRerunAlert, presenting: stepToRerun) { step in
             Button("Cancel", role: .cancel) { }
             Button("Rerun") {
