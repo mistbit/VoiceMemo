@@ -264,7 +264,10 @@ class PollingNode: PipelineNode {
         // Try to fetch summarization data
         if let summarizationUrl = result["Summarization"] as? String {
             if let data = try? await service.fetchJSON(url: summarizationUrl) {
-                return try? JSONSerialization.data(withJSONObject: data).base64EncodedString()
+                if let jsonData = try? JSONSerialization.data(withJSONObject: data),
+                   let jsonString = String(data: jsonData, encoding: .utf8) {
+                    return jsonString
+                }
             }
         }
         return nil
@@ -274,7 +277,10 @@ class PollingNode: PipelineNode {
         // Try to fetch transcription data
         if let transcriptionUrl = result["Transcription"] as? String {
             if let data = try? await service.fetchJSON(url: transcriptionUrl) {
-                return try? JSONSerialization.data(withJSONObject: data).base64EncodedString()
+                if let jsonData = try? JSONSerialization.data(withJSONObject: data),
+                   let jsonString = String(data: jsonData, encoding: .utf8) {
+                    return jsonString
+                }
             }
         }
         return nil
@@ -284,7 +290,10 @@ class PollingNode: PipelineNode {
         // Try to fetch conversation data if available
         if let conversationUrl = result["Conversation"] as? String {
             if let data = try? await service.fetchJSON(url: conversationUrl) {
-                return try? JSONSerialization.data(withJSONObject: data).base64EncodedString()
+                if let jsonData = try? JSONSerialization.data(withJSONObject: data),
+                   let jsonString = String(data: jsonData, encoding: .utf8) {
+                    return jsonString
+                }
             }
         }
         return nil
@@ -293,7 +302,10 @@ class PollingNode: PipelineNode {
     private func fetchRawData(from data: [String: Any]?, service: TingwuService) async -> String? {
         // Store the complete raw response data
         if let data = data {
-            return try? JSONSerialization.data(withJSONObject: data).base64EncodedString()
+            if let jsonData = try? JSONSerialization.data(withJSONObject: data),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                return jsonString
+            }
         }
         return nil
     }
