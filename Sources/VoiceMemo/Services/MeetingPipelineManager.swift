@@ -29,6 +29,10 @@ class MeetingPipelineManager: ObservableObject {
             self.transcriptionService = VolcengineService(settings: settings)
         }
     }
+
+    var activeTranscriptionService: TranscriptionService {
+        transcriptionService
+    }
     
     // MARK: - Public Actions
     

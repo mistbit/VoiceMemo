@@ -296,10 +296,7 @@ class PollingNode: PipelineNode {
         }
         
         if !combinedData.isEmpty {
-            if let jsonData = try? JSONSerialization.data(withJSONObject: combinedData),
-               let jsonString = String(data: jsonData, encoding: .utf8) {
-                return jsonString
-            }
+            return jsonString(from: combinedData)
         }
         
         return nil
@@ -309,10 +306,7 @@ class PollingNode: PipelineNode {
         // Try to fetch transcription data
         if let transcriptionUrl = result["Transcription"] as? String {
             if let data = try? await service.fetchJSON(url: transcriptionUrl) {
-                if let jsonData = try? JSONSerialization.data(withJSONObject: data),
-                   let jsonString = String(data: jsonData, encoding: .utf8) {
-                    return jsonString
-                }
+                return jsonString(from: data)
             }
         }
         return nil
@@ -322,10 +316,7 @@ class PollingNode: PipelineNode {
         // Try to fetch conversation data if available
         if let conversationUrl = result["Conversation"] as? String {
             if let data = try? await service.fetchJSON(url: conversationUrl) {
-                if let jsonData = try? JSONSerialization.data(withJSONObject: data),
-                   let jsonString = String(data: jsonData, encoding: .utf8) {
-                    return jsonString
-                }
+                return jsonString(from: data)
             }
         }
         return nil
@@ -333,11 +324,14 @@ class PollingNode: PipelineNode {
     
     private func fetchRawData(from data: [String: Any]?, service: TranscriptionService) async -> String? {
         // Store the complete raw response data
-        if let data = data {
-            if let jsonData = try? JSONSerialization.data(withJSONObject: data),
-               let jsonString = String(data: jsonData, encoding: .utf8) {
-                return jsonString
-            }
+        guard let data = data else { return nil }
+        return jsonString(from: data)
+    }
+
+    private func jsonString(from data: [String: Any]) -> String? {
+        if let jsonData = try? JSONSerialization.data(withJSONObject: data),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            return jsonString
         }
         return nil
     }

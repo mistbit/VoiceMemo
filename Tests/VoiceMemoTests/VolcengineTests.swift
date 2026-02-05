@@ -9,23 +9,12 @@ final class VolcengineTests: XCTestCase {
         // Default is Tingwu
         settings.asrProvider = .tingwu
         let manager1 = MeetingPipelineManager(task: MeetingTask(recordingId: "1", localFilePath: "", title: ""), settings: settings)
-        // Accessing private property via Mirror for testing verification
-        let mirror1 = Mirror(reflecting: manager1)
-        if let service = mirror1.children.first(where: { $0.label == "transcriptionService" })?.value {
-             XCTAssertTrue(service is TingwuService)
-        } else {
-            XCTFail("transcriptionService not found")
-        }
+        XCTAssertTrue(manager1.activeTranscriptionService is TingwuService)
         
         // Switch to Volcengine
         settings.asrProvider = .volcengine
         let manager2 = MeetingPipelineManager(task: MeetingTask(recordingId: "2", localFilePath: "", title: ""), settings: settings)
-        let mirror2 = Mirror(reflecting: manager2)
-        if let service = mirror2.children.first(where: { $0.label == "transcriptionService" })?.value {
-             XCTAssertTrue(service is VolcengineService)
-        } else {
-             XCTFail("transcriptionService not found")
-        }
+        XCTAssertTrue(manager2.activeTranscriptionService is VolcengineService)
     }
     
     func testTranscriptParsingFromUtterances() {

@@ -3,6 +3,7 @@ import CryptoKit
 
 class TingwuService: TranscriptionService {
     private let settings: SettingsStore
+    private let baseURL = "https://tingwu.cn-beijing.aliyuncs.com/openapi/tingwu/v2"
     
     init(settings: SettingsStore) {
         self.settings = settings
@@ -19,12 +20,12 @@ class TingwuService: TranscriptionService {
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw NSError(domain: "TingwuService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+            throw TranscriptionError.invalidResponse
         }
         
         if httpResponse.statusCode != 200 {
             let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw NSError(domain: "TingwuService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+            throw TranscriptionError.taskCreationFailed(errorMsg)
         }
         
         // Parse Response
@@ -34,12 +35,12 @@ class TingwuService: TranscriptionService {
             return taskId
         }
         
-        throw NSError(domain: "TingwuService", code: 0, userInfo: [NSLocalizedDescriptionKey: "TaskId not found in response"])
+        throw TranscriptionError.parseError("TaskId not found in response")
     }
 
     internal func buildCreateTaskRequest(fileUrl: String) throws -> URLRequest {
         guard let appKey = settings.tingwuAppKey.isEmpty ? nil : settings.tingwuAppKey else {
-            throw NSError(domain: "TingwuService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Missing AppKey"])
+            throw TranscriptionError.invalidCredentials
         }
         
         var parameters: [String: Any] = [
@@ -93,7 +94,7 @@ class TingwuService: TranscriptionService {
         
         parameters["Parameters"] = apiParams
         
-        let url = URL(string: "https://tingwu.cn-beijing.aliyuncs.com/openapi/tingwu/v2/tasks")!
+        let url = try endpointURL(path: "/tasks")
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("CreateTask", forHTTPHeaderField: "x-acs-action")
@@ -109,7 +110,7 @@ class TingwuService: TranscriptionService {
     
     func getTaskInfo(taskId: String) async throws -> (status: String, result: [String: Any]?) {
         // GET /openapi/tingwu/v2/tasks/{taskId}
-        let url = URL(string: "https://tingwu.cn-beijing.aliyuncs.com/openapi/tingwu/v2/tasks/\(taskId)")!
+        let url = try endpointURL(path: "/tasks/\(taskId)")
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("GetTaskInfo", forHTTPHeaderField: "x-acs-action")
@@ -123,12 +124,12 @@ class TingwuService: TranscriptionService {
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw NSError(domain: "TingwuService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+            throw TranscriptionError.invalidResponse
         }
         
         if httpResponse.statusCode != 200 {
              let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw NSError(domain: "TingwuService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+            throw TranscriptionError.taskQueryFailed(errorMsg)
         }
         
         if settings.enableVerboseLogging {
@@ -140,7 +141,7 @@ class TingwuService: TranscriptionService {
         
         guard var dataObj = json?["Data"] as? [String: Any],
               let status = dataObj["TaskStatus"] as? String else {
-             throw NSError(domain: "TingwuService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid status response"])
+             throw TranscriptionError.parseError("Invalid status response")
         }
         
         // Inject top-level fields for better error handling
@@ -154,7 +155,7 @@ class TingwuService: TranscriptionService {
     
     func fetchJSON(url: String) async throws -> [String: Any] {
         guard let urlObj = URL(string: url) else {
-            throw NSError(domain: "TingwuService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL: \(url)"])
+            throw TranscriptionError.invalidURL(url)
         }
         
         if settings.enableVerboseLogging {
@@ -163,7 +164,7 @@ class TingwuService: TranscriptionService {
         
         let (data, response) = try await URLSession.shared.data(from: urlObj)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw NSError(domain: "TingwuService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to fetch JSON from \(url)"])
+            throw TranscriptionError.serviceUnavailable
         }
         
         if settings.enableVerboseLogging {
@@ -175,7 +176,7 @@ class TingwuService: TranscriptionService {
             return json
         }
         
-        throw NSError(domain: "TingwuService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON response from \(url)"])
+        throw TranscriptionError.parseError("Invalid JSON response from \(url)")
     }
     
     // MARK: - V3 Signature Implementation
@@ -183,7 +184,7 @@ class TingwuService: TranscriptionService {
     private func signRequest(_ request: inout URLRequest, body: Data?) async throws {
         guard let akId = settings.getAccessKeyId(),
               let akSecret = settings.getAccessKeySecret() else {
-            throw NSError(domain: "TingwuService", code: 401, userInfo: [NSLocalizedDescriptionKey: "Missing AccessKey"])
+            throw TranscriptionError.invalidCredentials
         }
         
         // 1. Headers
@@ -296,6 +297,13 @@ class TingwuService: TranscriptionService {
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-_.~")
         return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+    }
+    
+    private func endpointURL(path: String) throws -> URL {
+        if let url = URL(string: "\(baseURL)\(path)") {
+            return url
+        }
+        throw TranscriptionError.invalidURL(baseURL)
     }
     
     private func hmac(key: String, string: String) -> String {

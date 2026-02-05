@@ -11,7 +11,7 @@ class VolcengineService: TranscriptionService {
     // MARK: - TranscriptionService Implementation
     
     func createTask(fileUrl: String) async throws -> String {
-        let url = URL(string: "\(baseURL)/submit")!
+        let url = try endpointURL(path: "/submit")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         
@@ -54,7 +54,7 @@ class VolcengineService: TranscriptionService {
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw NSError(domain: "VolcengineService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+            throw TranscriptionError.invalidResponse
         }
         
         if settings.enableVerboseLogging {
@@ -64,13 +64,13 @@ class VolcengineService: TranscriptionService {
         
         if httpResponse.statusCode != 200 {
             let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw NSError(domain: "VolcengineService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+            throw TranscriptionError.taskCreationFailed(errorMsg)
         }
         
         // Header Response Check
         if let apiCode = httpResponse.value(forHTTPHeaderField: "X-Api-Status-Code"), apiCode != "20000000" {
              let apiMsg = httpResponse.value(forHTTPHeaderField: "X-Api-Message") ?? "Unknown API Error"
-             throw NSError(domain: "VolcengineService", code: Int(apiCode) ?? 500, userInfo: [NSLocalizedDescriptionKey: "API Error: \(apiMsg)"])
+             throw TranscriptionError.taskCreationFailed("API Error: \(apiMsg)")
         }
         
         // Volcengine uses the Request-Id as the Task-Id for query
@@ -78,7 +78,7 @@ class VolcengineService: TranscriptionService {
     }
     
     func getTaskInfo(taskId: String) async throws -> (status: String, result: [String: Any]?) {
-        let url = URL(string: "\(baseURL)/query")!
+        let url = try endpointURL(path: "/query")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         
@@ -95,7 +95,7 @@ class VolcengineService: TranscriptionService {
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw NSError(domain: "VolcengineService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+            throw TranscriptionError.invalidResponse
         }
         
         if settings.enableVerboseLogging {
@@ -105,7 +105,7 @@ class VolcengineService: TranscriptionService {
         
         if httpResponse.statusCode != 200 {
              let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw NSError(domain: "VolcengineService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+            throw TranscriptionError.taskQueryFailed(errorMsg)
         }
         
         // Check X-Api-Status-Code
@@ -140,35 +140,42 @@ class VolcengineService: TranscriptionService {
     func fetchJSON(url: String) async throws -> [String: Any] {
         // Standard JSON fetch
         guard let urlObj = URL(string: url) else {
-            throw NSError(domain: "VolcengineService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL: \(url)"])
+            throw TranscriptionError.invalidURL(url)
         }
         
         let (data, response) = try await URLSession.shared.data(from: urlObj)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw NSError(domain: "VolcengineService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to fetch JSON"])
+            throw TranscriptionError.serviceUnavailable
         }
         
         if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
             return json
         }
         
-        throw NSError(domain: "VolcengineService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON"])
+        throw TranscriptionError.parseError("Invalid JSON")
     }
     
     // MARK: - Helpers
     
     private func addAuthHeaders(to request: inout URLRequest) throws {
         guard !settings.volcAppId.isEmpty else {
-             throw NSError(domain: "VolcengineService", code: 400, userInfo: [NSLocalizedDescriptionKey: "Missing Volcengine App ID"])
+             throw TranscriptionError.invalidCredentials
         }
         guard let accessToken = settings.getVolcAccessToken(), !accessToken.isEmpty else {
-            throw NSError(domain: "VolcengineService", code: 401, userInfo: [NSLocalizedDescriptionKey: "Missing Volcengine Access Token"])
+            throw TranscriptionError.invalidCredentials
         }
         
         request.setValue(settings.volcAppId, forHTTPHeaderField: "X-Api-App-Key")
         request.setValue(accessToken, forHTTPHeaderField: "X-Api-Access-Key")
         request.setValue(settings.volcResourceId, forHTTPHeaderField: "X-Api-Resource-Id")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    }
+
+    private func endpointURL(path: String) throws -> URL {
+        if let url = URL(string: "\(baseURL)\(path)") {
+            return url
+        }
+        throw TranscriptionError.invalidURL(baseURL)
     }
 
     private func inferAudioFormat(from fileUrl: String) -> String {
