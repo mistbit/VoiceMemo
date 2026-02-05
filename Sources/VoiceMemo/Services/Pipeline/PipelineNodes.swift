@@ -238,6 +238,8 @@ class PollingNode: PipelineNode {
         } else if status == "FAILED" {
             let errorMsg = (data?["StatusText"] as? String) 
                 ?? (data?["_OuterMessage"] as? String)
+                ?? (data?["Message"] as? String)
+                ?? (data?["Code"] as? String)
                 ?? "Unknown cloud error"
             
             // Debug logging

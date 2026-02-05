@@ -169,6 +169,11 @@ class MeetingPipelineManager: ObservableObject {
                         }
                     }
                     
+                    if let transcriptionError = error as? TranscriptionError {
+                        await updateStatus(.failed, step: node.step, error: formatTranscriptionError(transcriptionError), isFailed: true)
+                        return
+                    }
+                    
                     // Backward compatibility: handle non-PipelineError NSError
                     let nsError = error as NSError
                     if nsError.code == 202 {
@@ -339,6 +344,13 @@ class MeetingPipelineManager: ObservableObject {
             }
         }
         await self.save()
+    }
+
+    private func formatTranscriptionError(_ error: TranscriptionError) -> String {
+        if let description = error.errorDescription, let suggestion = error.recoverySuggestion {
+            return "\(description). \(suggestion)"
+        }
+        return error.errorDescription ?? error.localizedDescription
     }
     
     // MARK: - Legacy Support for Tests
