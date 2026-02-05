@@ -7,7 +7,7 @@ struct ResultView: View {
     @State private var selectedTab: ResultTab = .overview
     @State private var loadedTask: MeetingTask?
     @State private var isLoadingDetails = false
-    @State private var cachedTranscript: String?
+    @State private var cachedTranscript: [TranscriptLine]?
     @State private var isLoadingTranscript = false
     @Namespace private var animationNamespace
     
@@ -113,7 +113,7 @@ struct ResultView: View {
                             ProgressView("Loading transcript...")
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
-                            TranscriptView(text: cachedTranscript ?? "No transcript available.")
+                            TranscriptView(lines: cachedTranscript ?? [])
                         }
                     case .raw:
                         ScrollView {
@@ -178,7 +178,7 @@ struct ResultView: View {
             md += "## Action Items\n\(actionItems)\n\n"
         }
         
-        if let transcript = Self.computeTranscript(task: task) {
+        if let transcript = Self.computeTranscriptText(task: task) {
             md += "## Transcript\n\(transcript)\n"
         }
         
@@ -213,37 +213,43 @@ struct ResultView: View {
         let task = self.effectiveTask
         
         Task.detached(priority: .userInitiated) {
-            let text = Self.computeTranscript(task: task)
+            let lines = Self.computeTranscript(task: task)
             await MainActor.run {
-                self.cachedTranscript = text
+                self.cachedTranscript = lines
                 self.isLoadingTranscript = false
             }
         }
     }
     
-    private static func computeTranscript(task: MeetingTask) -> String? {
-        if let transcript = task.transcript, !transcript.isEmpty {
-            return transcript
-        }
-        
+    private static func computeTranscript(task: MeetingTask) -> [TranscriptLine]? {
         // Try to parse from transcriptData (full JSON from DB)
         if let dataStr = task.transcriptData {
             if let data = dataStr.data(using: .utf8),
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                if let text = TranscriptParser.buildTranscriptText(from: json) {
-                    return text
-                }
+                let lines = TranscriptParser.parse(from: json)
+                if !lines.isEmpty { return lines }
             }
         }
         
         if let raw = task.rawResponse {
-            guard let data = raw.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                return nil
+            if let data = raw.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let lines = TranscriptParser.parse(from: json)
+                if !lines.isEmpty { return lines }
             }
-            return TranscriptParser.buildTranscriptText(from: json)
         }
         
+        if let transcript = task.transcript, !transcript.isEmpty {
+            return [TranscriptLine(speaker: nil, text: transcript, startTime: nil, endTime: nil)]
+        }
+        
+        return nil
+    }
+    
+    private static func computeTranscriptText(task: MeetingTask) -> String? {
+        if let lines = computeTranscript(task: task) {
+            return lines.map { $0.formattedString }.joined(separator: "\n")
+        }
         return nil
     }
 }
@@ -350,16 +356,35 @@ struct OverviewView: View {
 }
 
 struct TranscriptView: View {
-    let text: String
+    let lines: [TranscriptLine]
     
     var body: some View {
         ScrollView {
-            Text(text)
-                .font(.body)
-                .lineSpacing(6)
-                .padding(24)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
+            LazyVStack(alignment: .leading, spacing: 16) {
+                if lines.isEmpty {
+                    Text("No transcript available.")
+                        .foregroundColor(.secondary)
+                        .padding(24)
+                } else {
+                    ForEach(lines) { line in
+                        VStack(alignment: .leading, spacing: 4) {
+                            if let speaker = line.speaker {
+                                Text(speaker)
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.secondary)
+                            }
+                            Text(line.text)
+                                .font(.body)
+                                .lineSpacing(4)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.horizontal, 24)
+                        .textSelection(.enabled)
+                    }
+                }
+            }
+            .padding(.vertical, 24)
         }
     }
 }

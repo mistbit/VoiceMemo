@@ -53,9 +53,10 @@ final class MySQLStorage: StorageProvider, @unchecked Sendable {
         
         let source = MySQLConnectionSource(configuration: mysqlConfig)
         // Optimize connection pool settings
+        // Note: EventLoopGroupConnectionPool initializer signature depends on AsyncKit version
+        // Falling back to standard init and relying on internal pool management if explicit config is not available
         self.pool = EventLoopGroupConnectionPool(
             source: source,
-            maxConnectionsAvailable: 10, // Limit max connections
             on: group
         )
     }
