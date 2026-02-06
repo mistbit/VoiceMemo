@@ -96,12 +96,7 @@ struct ResultView: View {
                 case .transcript:
                     TranscriptView(text: derivedTranscript() ?? "No transcript available.")
                 case .raw:
-                    ScrollView {
-                        Text(task.rawData ?? task.rawResponse ?? "No raw response.")
-                            .font(.monospaced(.body)())
-                            .padding(24)
-                            .textSelection(.enabled)
-                    }
+                    RawDataView(text: task.rawData ?? task.rawResponse ?? "No raw response.")
                 case .pipeline:
                     PipelineView(task: task, settings: settings) {
                         withAnimation {
@@ -421,6 +416,123 @@ struct SectionCard: View {
             return try AttributedString(markdown: content)
         } catch {
             return AttributedString(stringLiteral: content)
+        }
+    }
+}
+
+struct RawDataView: View {
+    let text: String
+    @State private var formattedText: String = ""
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    
+    private let maxTextSize = 50 * 1024 * 1024
+    
+    var body: some View {
+        Group {
+            if isLoading {
+                VStack {
+                    ProgressView()
+                    Text("Loading raw data...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 8)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(spacing: 0) {
+                    if let error = errorMessage {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.orange.opacity(0.1))
+                    }
+                    
+                    NativeTextView(text: formattedText)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        }
+        .task {
+            await formatText()
+        }
+    }
+    
+    private func formatText() async {
+        isLoading = true
+        errorMessage = nil
+        
+        if text.utf8.count > maxTextSize {
+            formattedText = text
+            errorMessage = "Raw data is too large to format. Showing original text."
+            isLoading = false
+            return
+        }
+        
+        let result: (String, String?) = await Task.detached(priority: .userInitiated) {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let isJson = trimmed.hasPrefix("{") || trimmed.hasPrefix("[")
+            
+            if isJson,
+               let data = text.data(using: .utf8),
+               let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []),
+               let prettyData = try? JSONSerialization.data(withJSONObject: jsonObject, options: [.prettyPrinted, .sortedKeys]),
+               let prettyString = String(data: prettyData, encoding: .utf8) {
+                return (prettyString, nil)
+            }
+            
+            if isJson {
+                return (text, "Raw data is not valid JSON. Showing original text.")
+            }
+            
+            return (text, nil)
+        }.value
+        
+        self.formattedText = result.0
+        self.errorMessage = result.1
+        self.isLoading = false
+    }
+}
+
+struct NativeTextView: NSViewRepresentable {
+    let text: String
+    
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+        
+        let textView = NSTextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        textView.textColor = .labelColor
+        textView.backgroundColor = .clear
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = true
+        textView.textContainer?.widthTracksTextView = false
+        textView.textContainer?.heightTracksTextView = false
+        textView.textContainerInset = NSSize(width: 10, height: 10)
+        
+        scrollView.documentView = textView
+        
+        return scrollView
+    }
+    
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? NSTextView else { return }
+        if textView.string != text {
+            textView.string = text
         }
     }
 }
