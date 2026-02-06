@@ -206,40 +206,78 @@ struct SettingsView: View {
     
     private var logsForm: some View {
         VStack(spacing: Layout.standardSpacing) {
-            StyledGroupBox("Logs") {
-                FormRow(label: "Settings") {
+            StyledGroupBox("Configuration") {
+                FormRow(label: "Log Level") {
                     Toggle("Verbose Logging", isOn: $settings.enableVerboseLogging)
                         .toggleStyle(.switch)
                         .labelsHidden()
-                    Text("Enable detailed debug logs")
+                    Text("Enable detailed debug logs for troubleshooting")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .padding(.leading, 8)
+                    Spacer()
                 }
-                
-                Divider()
-                
-                FormRow(label: "Path") {
-                    Text(settings.logFileURL().path)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .textSelection(.enabled)
-                }
-                
-                FormRow(label: "Actions") {
-                    HStack {
-                        Button("Show Log") {
-                            showingLog = true
+            }
+            
+            StyledGroupBox("Log File") {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Path Display
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Location")
+                                .foregroundColor(.secondary)
+                                .font(.callout)
+                            Spacer()
+                            Button(action: {
+                                let pasteboard = NSPasteboard.general
+                                pasteboard.clearContents()
+                                pasteboard.setString(settings.logFileURL().path, forType: .string)
+                            }) {
+                                Label("Copy Path", systemImage: "doc.on.doc")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.borderless)
+                            .foregroundColor(.blue)
                         }
-                        Button("Open Folder") {
+                        
+                        Text(settings.logFileURL().path)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.primary)
+                            .padding(10)
+                            .background(Color(nsColor: .textBackgroundColor))
+                            .cornerRadius(6)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    
+                    Divider()
+                    
+                    // Actions
+                    HStack(spacing: 16) {
+                        Button(action: { showingLog = true }) {
+                            Label("View Logs", systemImage: "doc.text.magnifyingglass")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 4)
+                        }
+                        
+                        Button(action: {
                             let url = settings.logFileURL().deletingLastPathComponent()
                             NSWorkspace.shared.open(url)
+                        }) {
+                            Label("Reveal in Finder", systemImage: "folder")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 4)
                         }
-                        Button("Clear Log") {
-                            settings.clearLogFile()
+                        
+                        Button(action: { settings.clearLogFile() }) {
+                            Label("Clear", systemImage: "trash")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 4)
+                                .foregroundColor(.red)
                         }
                     }
                 }
+                .padding(.vertical, 4)
             }
         }
     }
