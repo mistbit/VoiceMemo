@@ -12,7 +12,6 @@ struct RecordingView: View {
             HStack(alignment: .center) {
                 Text("New Recording")
                     .font(.title2)
-                    .fontWeight(.bold)
                 
                 Spacer()
                 
@@ -39,7 +38,7 @@ struct RecordingView: View {
                         // Target Application Section
                     HStack {
                         Text("Target Application")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 14))
                             .foregroundColor(.primary)
                         
                         Spacer()
@@ -158,7 +157,7 @@ struct RecordingView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Text("Latest Task Processing")
-                                .font(.headline)
+                                .font(.title3)
                             Spacer()
                             StatusBadge(status: task.status)
                         }
