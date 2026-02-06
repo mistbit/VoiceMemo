@@ -77,7 +77,8 @@ enum ImportModeItem: String, Hashable, CaseIterable, Identifiable {
 
 enum SettingsCategory: String, Hashable, CaseIterable, Identifiable {
     case general
-    case cloud
+    case asr
+    case oss
     case storage
     
     var id: String { rawValue }
@@ -85,7 +86,8 @@ enum SettingsCategory: String, Hashable, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: return "General"
-        case .cloud: return "Cloud & AI"
+        case .asr: return "ASR Service"
+        case .oss: return "Object Storage"
         case .storage: return "Storage"
         }
     }
@@ -93,7 +95,8 @@ enum SettingsCategory: String, Hashable, CaseIterable, Identifiable {
     var description: String {
         switch self {
         case .general: return "Basic settings including language and appearance."
-        case .cloud: return "Configure cloud services and AI parameters."
+        case .asr: return "Configure Speech-to-Text providers and parameters."
+        case .oss: return "Configure Object Storage Service (OSS) settings."
         case .storage: return "Manage data persistence and database connections."
         }
     }
@@ -101,7 +104,8 @@ enum SettingsCategory: String, Hashable, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .general: return "gearshape"
-        case .cloud: return "cloud"
+        case .asr: return "waveform"
+        case .oss: return "server.rack"
         case .storage: return "externaldrive"
         }
     }

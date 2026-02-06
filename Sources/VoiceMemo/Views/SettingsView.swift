@@ -28,15 +28,18 @@ struct SettingsView: View {
                     switch category {
                     case .general:
                         generalForm
-                    case .cloud:
-                        cloudForm
+                    case .asr:
+                        asrForm
+                    case .oss:
+                        ossForm
                     case .storage:
                         storageForm
                     }
                 } else {
                     TabView {
                         generalForm.tabItem { Text("General") }
-                        cloudForm.tabItem { Text("Cloud") }
+                        asrForm.tabItem { Text("ASR") }
+                        ossForm.tabItem { Text("OSS") }
                         storageForm.tabItem { Text("Storage") }
                     }
                 }
@@ -234,7 +237,7 @@ struct SettingsView: View {
         }
     }
     
-    private var cloudForm: some View {
+    private var asrForm: some View {
         VStack(spacing: Layout.standardSpacing) {
             StyledGroupBox("ASR Provider") {
                 FormRow(label: "Provider") {
@@ -328,7 +331,11 @@ struct SettingsView: View {
                     }
                 }
             }
-            
+        }
+    }
+    
+    private var ossForm: some View {
+        VStack(spacing: Layout.standardSpacing) {
             StyledGroupBox("OSS Configuration") {
                 FormRow(label: "Region") {
                     TextField("e.g. cn-beijing", text: $settings.ossRegion)
@@ -382,8 +389,6 @@ struct SettingsView: View {
                     }
                 }
             }
-            
-            // Removed common Access Credentials section as it's now provider specific above
             
             StyledGroupBox("Connection Test") {
                 FormRow(label: "OSS Upload") {
