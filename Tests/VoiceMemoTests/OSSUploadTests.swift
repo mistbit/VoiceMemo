@@ -24,8 +24,8 @@ final class OSSUploadTests: XCTestCase {
         settings.ossEndpoint = ossEndpoint
         settings.ossBucket = ossBucket
         settings.ossPrefix = ossPrefix
-        settings.saveAccessKeyId(ossAccessKeyId)
-        settings.saveAccessKeySecret(ossAccessKeySecret)
+        settings.saveOSSAccessKeyId(ossAccessKeyId)
+        settings.saveOSSAccessKeySecret(ossAccessKeySecret)
         
         defer {
             settings.clearSecrets()

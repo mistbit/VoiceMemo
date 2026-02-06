@@ -6,8 +6,11 @@ struct SettingsView: View {
     @ObservedObject var storageManager = StorageManager.shared
     var category: SettingsCategory?
     
-    @State private var akIdInput: String = ""
-    @State private var akSecretInput: String = ""
+    @State private var tingwuAkIdInput: String = ""
+    @State private var tingwuAkSecretInput: String = ""
+    @State private var ossAkIdInput: String = ""
+    @State private var ossAkSecretInput: String = ""
+    @State private var volcAccessTokenInput: String = ""
     @State private var mysqlPasswordInput: String = ""
     @State private var testStatus: String = ""
     @State private var mysqlTestStatus: String = ""
@@ -233,10 +236,96 @@ struct SettingsView: View {
     
     private var cloudForm: some View {
         VStack(spacing: Layout.standardSpacing) {
-            StyledGroupBox("Tingwu Configuration") {
-                FormRow(label: "AppKey") {
-                    TextField("Required", text: $settings.tingwuAppKey)
-                        .textFieldStyle(.roundedBorder)
+            StyledGroupBox("ASR Provider") {
+                FormRow(label: "Provider") {
+                    Picker("", selection: $settings.asrProvider) {
+                        Text("Aliyun Tingwu").tag(SettingsStore.ASRProvider.tingwu)
+                        Text("Volcengine (Doubao)").tag(SettingsStore.ASRProvider.volcengine)
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: Layout.standardPickerWidth)
+                    
+                    Spacer()
+                }
+            }
+            
+            if settings.asrProvider == .tingwu {
+                StyledGroupBox("Tingwu Configuration") {
+                    FormRow(label: "AppKey") {
+                        TextField("Required", text: $settings.tingwuAppKey)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                }
+                
+                StyledGroupBox("Access Credentials (RAM)") {
+                    FormRow(label: "AccessKeyId") {
+                        CredentialRow(
+                            hasValue: settings.hasTingwuAccessKeyId,
+                            input: $tingwuAkIdInput,
+                            placeholder: "Paste AccessKeyId",
+                            isSecure: false,
+                            onClear: { settings.clearTingwuSecrets() }
+                        )
+                    }
+                    
+                    FormRow(label: "AccessKeySecret") {
+                        CredentialRow(
+                            hasValue: settings.hasTingwuAccessKeySecret,
+                            input: $tingwuAkSecretInput,
+                            placeholder: "Paste AccessKeySecret",
+                            isSecure: true,
+                            onClear: { settings.clearTingwuSecrets() }
+                        )
+                    }
+                    
+                    if !settings.hasTingwuAccessKeyId || !settings.hasTingwuAccessKeySecret {
+                        HStack {
+                            Spacer()
+                            Button("Save Credentials") {
+                                if !tingwuAkIdInput.isEmpty { settings.saveTingwuAccessKeyId(tingwuAkIdInput) }
+                                if !tingwuAkSecretInput.isEmpty { settings.saveTingwuAccessKeySecret(tingwuAkSecretInput) }
+                                tingwuAkIdInput = ""
+                                tingwuAkSecretInput = ""
+                            }
+                            .disabled(tingwuAkIdInput.isEmpty || tingwuAkSecretInput.isEmpty)
+                        }
+                    }
+                }
+            } else {
+                StyledGroupBox("Volcengine Configuration") {
+                    FormRow(label: "AppKey (AppID)") {
+                        TextField("Required", text: $settings.volcAppId)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    FormRow(label: "Cluster ID") {
+                        TextField("e.g. volc.bigasr.auc", text: $settings.volcResourceId)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                }
+                
+                StyledGroupBox("Access Token") {
+                    FormRow(label: "Access Token") {
+                        CredentialRow(
+                            hasValue: settings.hasVolcAccessToken,
+                            input: $volcAccessTokenInput,
+                            placeholder: "Paste Access Token",
+                            isSecure: true,
+                            onClear: { settings.clearVolcSecrets() }
+                        )
+                    }
+                    
+                    if !settings.hasVolcAccessToken {
+                        HStack {
+                            Spacer()
+                            Button("Save Token") {
+                                if !volcAccessTokenInput.isEmpty {
+                                    settings.saveVolcAccessToken(volcAccessTokenInput)
+                                    volcAccessTokenInput = ""
+                                }
+                            }
+                            .disabled(volcAccessTokenInput.isEmpty)
+                        }
+                    }
                 }
             }
             
@@ -257,42 +346,44 @@ struct SettingsView: View {
                     TextField("Path Prefix (e.g. voice/)", text: $settings.ossPrefix)
                         .textFieldStyle(.roundedBorder)
                 }
-            }
-            
-            StyledGroupBox("Access Credentials (RAM)") {
+                
+                Divider()
+                
                 FormRow(label: "AccessKeyId") {
                     CredentialRow(
-                        hasValue: settings.hasAccessKeyId,
-                        input: $akIdInput,
-                        placeholder: "Paste AccessKeyId",
+                        hasValue: settings.hasOSSAccessKeyId,
+                        input: $ossAkIdInput,
+                        placeholder: "Paste OSS AccessKeyId",
                         isSecure: false,
-                        onClear: { settings.clearSecrets() }
+                        onClear: { settings.clearOSSSecrets() }
                     )
                 }
                 
                 FormRow(label: "AccessKeySecret") {
                     CredentialRow(
-                        hasValue: settings.hasAccessKeySecret,
-                        input: $akSecretInput,
-                        placeholder: "Paste AccessKeySecret",
+                        hasValue: settings.hasOSSAccessKeySecret,
+                        input: $ossAkSecretInput,
+                        placeholder: "Paste OSS AccessKeySecret",
                         isSecure: true,
-                        onClear: { settings.clearSecrets() }
+                        onClear: { settings.clearOSSSecrets() }
                     )
                 }
                 
-                if !settings.hasAccessKeyId || !settings.hasAccessKeySecret {
+                if !settings.hasOSSAccessKeyId || !settings.hasOSSAccessKeySecret {
                     HStack {
                         Spacer()
-                        Button("Save Credentials") {
-                            if !akIdInput.isEmpty { settings.saveAccessKeyId(akIdInput) }
-                            if !akSecretInput.isEmpty { settings.saveAccessKeySecret(akSecretInput) }
-                            akIdInput = ""
-                            akSecretInput = ""
+                        Button("Save OSS Credentials") {
+                            if !ossAkIdInput.isEmpty { settings.saveOSSAccessKeyId(ossAkIdInput) }
+                            if !ossAkSecretInput.isEmpty { settings.saveOSSAccessKeySecret(ossAkSecretInput) }
+                            ossAkIdInput = ""
+                            ossAkSecretInput = ""
                         }
-                        .disabled(akIdInput.isEmpty || akSecretInput.isEmpty)
+                        .disabled(ossAkIdInput.isEmpty || ossAkSecretInput.isEmpty)
                     }
                 }
             }
+            
+            // Removed common Access Credentials section as it's now provider specific above
             
             StyledGroupBox("Connection Test") {
                 FormRow(label: "OSS Upload") {

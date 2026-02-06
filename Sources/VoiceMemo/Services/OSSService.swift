@@ -9,8 +9,8 @@ class OSSService {
     }
     
     func uploadFile(fileURL: URL, objectKey: String) async throws -> String {
-        guard let akId = settings.getAccessKeyId(),
-              let akSecret = settings.getAccessKeySecret() else {
+        guard let akId = settings.getOSSAccessKeyId(),
+              let akSecret = settings.getOSSAccessKeySecret() else {
             throw NSError(domain: "OSSService", code: 401, userInfo: [NSLocalizedDescriptionKey: "Missing AccessKey"])
         }
         

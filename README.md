@@ -12,7 +12,7 @@ Read this in Chinese: [README_CN.md](README_CN.md)
 - **Native Performance**: Built with SwiftUI and ScreenCaptureKit for optimal performance and low CPU overhead.
 - **Theme Mode**: System (Auto) / Light / Dark appearance selection in Settings.
 - **Privacy-First**: Operates locally on your machine with clear permission handling.
-- **Meeting Minutes (Alibaba Cloud Tingwu + OSS)**: Manual pipeline to transcribe audio and generate structured minutes (summary, key points, action items), with Markdown export.
+- **Meeting Minutes (Multi-Provider ASR)**: Support for **Alibaba Cloud Tingwu** and **Volcengine** (ByteDance) to transcribe audio and generate structured minutes (summary, key points, action items), with Markdown export.
 - **Storage Backends (SQLite/MySQL)**: Store history locally or in MySQL, with optional local-to-MySQL sync.
 
 ## Changelog
@@ -38,27 +38,31 @@ flowchart LR
     B --> C["MeetingTask"]
     C --> D["MeetingPipelineManager<br/>State machine"]
     D -->|Upload Raw| F1["OSSService<br/>Upload Original"]
-  D -->|Transcode| E["AVAssetExportSession<br/>mixed_48k.m4a"]
-  D -->|Upload| F2["OSSService<br/>Upload Mixed"]
-  D -->|Persist| SM["StorageManager<br/>StorageProvider"]
-  D -->|Config| S["SettingsStore"]
-  S --> K["KeychainHelper<br/>AK/SK"]
-  SM -->|Local| J1["SQLiteStorage<br/>SQLite"]
-  SM -->|Remote| J2["MySQLStorage<br/>mysql-kit"]
-  J1 --> V["SwiftUI Views<br/>SettingsView / PipelineView / ResultView"]
-  J2 --> V
+    D -->|Transcode| E["AVAssetExportSession<br/>mixed_48k.m4a"]
+    D -->|Upload| F2["OSSService<br/>Upload Mixed"]
+    D -->|Persist| SM["StorageManager<br/>StorageProvider"]
+    D -->|Config| S["SettingsStore"]
+    S --> K["KeychainHelper<br/>Credentials"]
+    SM -->|Local| J1["SQLiteStorage<br/>SQLite"]
+    SM -->|Remote| J2["MySQLStorage<br/>mysql-kit"]
+    J1 --> V["SwiftUI Views<br/>SettingsView / PipelineView / ResultView"]
+    J2 --> V
   end
 
-  subgraph Cloud["Alibaba Cloud"]
-  F1 --> G["OSS Bucket<br/>Public URL"]
-  F2 --> G
-  T["TingwuService<br/>CreateTask / GetTaskInfo"] --> R["Tingwu Offline ASR<br/>Minutes JSON"]
+  subgraph Cloud["Cloud Services"]
+    F1 --> G["OSS Bucket<br/>Public URL"]
+    F2 --> G
+    TS["TranscriptionService<br/>(Protocol)"]
+    T1["Alibaba Tingwu"]
+    T2["Volcengine"]
+    TS -.-> T1
+    TS -.-> T2
   end
 
   D -->|Upload| F1
   D -->|Upload| F2
-  G -->|FileUrl| T
-  T -->|Result| D
+  G -->|FileUrl| TS
+  TS -->|Result| D
 ```
 
 ## Project Structure
@@ -88,13 +92,17 @@ When you first start recording, macOS will request the following permissions:
 
 Please grant these permissions in **System Settings > Privacy & Security**.
 
-### 3. Configure Tingwu + OSS (optional)
+### 3. Configure ASR Provider + OSS (optional)
 
 Open Settings in the app and configure:
+
+**General:**
 - Theme: System (Auto) / Light / Dark
-- Alibaba Cloud AccessKeyId / AccessKeySecret (stored in Keychain)
-- Tingwu AppKey
-- OSS bucket / region / prefix
+- OSS Configuration (Required for file hosting): Alibaba Cloud AccessKeyId / AccessKeySecret, bucket, region, prefix
+
+**ASR Provider (Choose one):**
+- **Alibaba Tingwu**: AppKey
+- **Volcengine**: AppId, AccessToken, ResourceId (supports auto format inference)
 
 ### 4. Audio Outputs
 

@@ -7,7 +7,8 @@ class MeetingPipelineManager: ObservableObject {
     @Published var errorMessage: String?
     
     private let ossService: OSSService
-    private let tingwuService: TingwuService
+    private let transcriptionService: TranscriptionService
+    // private let tingwuService: TingwuService // Removed in favor of protocol
     private let settings: SettingsStore
     
     private struct PipelineConstants {
@@ -19,7 +20,18 @@ class MeetingPipelineManager: ObservableObject {
         self.task = task
         self.settings = settings
         self.ossService = OSSService(settings: settings)
-        self.tingwuService = TingwuService(settings: settings)
+        
+        // Factory logic for TranscriptionService
+        switch settings.asrProvider {
+        case .tingwu:
+            self.transcriptionService = TingwuService(settings: settings)
+        case .volcengine:
+            self.transcriptionService = VolcengineService(settings: settings)
+        }
+    }
+
+    var activeTranscriptionService: TranscriptionService {
+        transcriptionService
     }
     
     // MARK: - Public Actions
@@ -107,7 +119,7 @@ class MeetingPipelineManager: ObservableObject {
         // 1. Hydrate Board from Task
         let taskSnapshot = await MainActor.run { self.task }
         var board = createBoard(from: taskSnapshot)
-        let services = ServiceProvider(ossService: ossService, tingwuService: tingwuService)
+        let services = ServiceProvider(ossService: ossService, transcriptionService: transcriptionService)
         
         await MainActor.run { self.isProcessing = true }
         
@@ -155,6 +167,11 @@ class MeetingPipelineManager: ObservableObject {
                             await updateStatus(.failed, step: node.step, error: "Task failed: \(msg)", isFailed: true)
                             return
                         }
+                    }
+                    
+                    if let transcriptionError = error as? TranscriptionError {
+                        await updateStatus(.failed, step: node.step, error: formatTranscriptionError(transcriptionError), isFailed: true)
+                        return
                     }
                     
                     // Backward compatibility: handle non-PipelineError NSError
@@ -327,6 +344,13 @@ class MeetingPipelineManager: ObservableObject {
             }
         }
         await self.save()
+    }
+
+    private func formatTranscriptionError(_ error: TranscriptionError) -> String {
+        if let description = error.errorDescription, let suggestion = error.recoverySuggestion {
+            return "\(description). \(suggestion)"
+        }
+        return error.errorDescription ?? error.localizedDescription
     }
     
     // MARK: - Legacy Support for Tests

@@ -17,8 +17,8 @@ final class TingwuCreateTaskTests: XCTestCase {
         
         let settings = SettingsStore()
         settings.tingwuAppKey = appKey
-        settings.saveAccessKeyId(accessKeyId)
-        settings.saveAccessKeySecret(accessKeySecret)
+        settings.saveTingwuAccessKeyId(accessKeyId)
+        settings.saveTingwuAccessKeySecret(accessKeySecret)
         
         defer {
             settings.clearSecrets()
@@ -36,8 +36,8 @@ final class TingwuCreateTaskTests: XCTestCase {
         
         let settings = SettingsStore()
         settings.tingwuAppKey = "TEST_APP_KEY"
-        settings.saveAccessKeyId("TEST_AK_ID")
-        settings.saveAccessKeySecret("TEST_AK_SECRET")
+        settings.saveTingwuAccessKeyId("TEST_AK_ID")
+        settings.saveTingwuAccessKeySecret("TEST_AK_SECRET")
         
         // Enable features to test parameter generation
         settings.enableSummary = true
