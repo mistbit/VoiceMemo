@@ -145,14 +145,24 @@ Ensure you configure **Signing & Capabilities** with your Development Team to ru
 
 ## Roadmap
 
+### Completed
 - [x] Dual-track recording (Remote + Local)
 - [x] Automatic audio merging
 - [x] Audio Import (Support for external files)
+- [x] Multi-provider ASR architecture (Tingwu + Volcengine)
 - [x] Alibaba Cloud Tingwu offline transcription + minutes generation
+- [x] Volcengine ASR integration (V3 API)
 - [x] OSS upload integration
 - [x] Manual pipeline UI (transcode/upload/create/poll)
+- [x] MySQL storage backend with local-to-remote sync
+- [x] Unified error handling for ASR services
+
+### Planned
 - [ ] Speaker diarization (cloud-based)
 - [ ] Real-time transcription UI
+- [ ] Auto-pipeline execution (fully automated workflow)
+- [ ] Multi-language support for minutes generation
+- [ ] Advanced audio editing capabilities
 
 ## Contact
 
