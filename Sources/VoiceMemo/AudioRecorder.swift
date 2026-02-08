@@ -69,7 +69,9 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     func refreshAvailableApps() async {
         do {
             let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-            self.availableApps = content.applications.sorted { $0.applicationName < $1.applicationName }
+            self.availableApps = content.applications
+                .filter { !$0.applicationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                .sorted { $0.applicationName < $1.applicationName }
             
             if let wechat = self.availableApps.first(where: { $0.applicationName.lowercased().contains("wechat") || $0.applicationName.contains("微信") }) {
                 self.selectedApp = wechat
