@@ -19,7 +19,8 @@ See [01-architecture-overview.md](01-architecture-overview.md) for detailed arch
 - 02-audio-capture-and-merge.md
 - 03-pipeline-asr-oss.md
 - 04-storage-and-settings.md
-- 05-permissions-and-signing.md
-- 06-testing.md
+- 05-local-whisper-integration.md
+- 06-permissions-and-signing.md
+- 07-testing.md
 - 08-import-guide.md
 - 09-security-and-audit.md

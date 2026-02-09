@@ -107,6 +107,17 @@ class SettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(enableVerboseLogging, forKey: "enableVerboseLogging") }
     }
     
+    // Debug & Advanced Config
+    @Published var debugSaveIntermediateAudio: Bool {
+        didSet { UserDefaults.standard.set(debugSaveIntermediateAudio, forKey: "debugSaveIntermediateAudio") }
+    }
+    @Published var debugExportRawResults: Bool {
+        didSet { UserDefaults.standard.set(debugExportRawResults, forKey: "debugExportRawResults") }
+    }
+    @Published var debugLogModelTime: Bool {
+        didSet { UserDefaults.standard.set(debugLogModelTime, forKey: "debugLogModelTime") }
+    }
+    
     // Audio Recording Config
     @Published var savePathBookmark: Data? {
         didSet { UserDefaults.standard.set(savePathBookmark, forKey: "savePathBookmark") }
@@ -153,6 +164,11 @@ class SettingsStore: ObservableObject {
         let spkCount = UserDefaults.standard.integer(forKey: "speakerCount")
         self.speakerCount = (spkCount == 0) ? 2 : spkCount
         self.enableVerboseLogging = UserDefaults.standard.object(forKey: "enableVerboseLogging") as? Bool ?? false
+        
+        self.debugSaveIntermediateAudio = UserDefaults.standard.object(forKey: "debugSaveIntermediateAudio") as? Bool ?? false
+        self.debugExportRawResults = UserDefaults.standard.object(forKey: "debugExportRawResults") as? Bool ?? false
+        self.debugLogModelTime = UserDefaults.standard.object(forKey: "debugLogModelTime") as? Bool ?? true
+        
         self.savePathBookmark = UserDefaults.standard.data(forKey: "savePathBookmark")
         
         migrateLegacySecrets()

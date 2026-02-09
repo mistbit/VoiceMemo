@@ -44,7 +44,7 @@ accounts：
 
 ## 权限与 Entitlements
 
-权限与签名相关说明见：`doc/05-permissions-and-signing.zh-CN.md`。
+权限与签名相关说明见：`doc/06-permissions-and-signing.zh-CN.md`。
 
 审计关注点：
 

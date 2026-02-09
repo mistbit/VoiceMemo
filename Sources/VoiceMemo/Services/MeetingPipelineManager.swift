@@ -27,6 +27,8 @@ class MeetingPipelineManager: ObservableObject {
             self.transcriptionService = TingwuService(settings: settings)
         case .volcengine:
             self.transcriptionService = VolcengineService(settings: settings)
+        case .localWhisper:
+            self.transcriptionService = LocalWhisperService(settings: settings)
         }
     }
 
@@ -150,6 +152,9 @@ class MeetingPipelineManager: ObservableObject {
                         switch pipelineError {
                         case .taskRunning:
                             retryCount += 1
+                            if node.step == .polling {
+                                await persistPartialState(from: board, channelId: 0)
+                            }
                             if retryCount > PipelineConstants.maxPollingRetries {
                                 await updateStatus(.failed, step: node.step, error: "Polling timeout", isFailed: true)
                                 return
@@ -258,6 +263,16 @@ class MeetingPipelineManager: ObservableObject {
         await MainActor.run {
             updateChannelFields(channel: channel)
             updateChannelStatus(completedStep: completedStep)
+            self.errorMessage = nil
+        }
+        await self.save()
+    }
+    
+    private func persistPartialState(from board: PipelineBoard, channelId: Int) async {
+        guard let channel = board.channels[channelId] else { return }
+        
+        await MainActor.run {
+            updateChannelFields(channel: channel)
             self.errorMessage = nil
         }
         await self.save()

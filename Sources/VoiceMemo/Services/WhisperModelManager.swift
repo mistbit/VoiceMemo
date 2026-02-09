@@ -1,8 +1,8 @@
 import Foundation
-import WhisperKit
+@preconcurrency import WhisperKit
 import Combine
 
-class WhisperModelManager: ObservableObject {
+class WhisperModelManager: ObservableObject, @unchecked Sendable {
     static let shared = WhisperModelManager()
     
     @Published var currentModelName: String = "base"
@@ -12,14 +12,53 @@ class WhisperModelManager: ObservableObject {
         "tiny", "base", "small", "medium", "large-v3", "distil-large-v3"
     ]
     
-    var pipe: WhisperKit?
+    // Public accessor for the current active pipe (for backward compatibility/simplicity)
+    var pipe: WhisperKit? {
+        get {
+            // Return the pipe for currentModelName if loaded
+            if case .loaded(let p, _) = models[currentModelName] { return p }
+            if case .cached(let p, _) = models[currentModelName] { return p }
+            return nil
+        }
+    }
     
-    private init() {}
+    enum ModelInstance {
+        case unloaded
+        case cached(pipe: WhisperKit, lastUsed: Date)
+        case loaded(pipe: WhisperKit, inUseCount: Int)
+    }
+    
+    private var models: [String: ModelInstance] = [:]
+    private let cacheTimeout: TimeInterval = 300 // 5 minutes
+    private let queue = DispatchQueue(label: "com.voicememo.modelmanager", attributes: .concurrent)
+    
+    private init() {
+        // Start cleanup timer
+        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            self?.cleanupExpiredModels()
+        }
+    }
     
     func loadModel(_ name: String) async throws {
-        // If we already have a pipe and the model matches, reuse it.
-        // Note: We might want to add a check if the pipe is actually valid/ready.
-        if let _ = pipe, currentModelName == name {
+        // Check if already loaded or cached
+        var shouldLoad = false
+        queue.sync {
+            if let instance = models[name] {
+                switch instance {
+                case .loaded(let p, let count):
+                    models[name] = .loaded(pipe: p, inUseCount: count + 1)
+                case .cached(let p, _):
+                    models[name] = .loaded(pipe: p, inUseCount: 1)
+                case .unloaded:
+                    shouldLoad = true
+                }
+            } else {
+                shouldLoad = true
+            }
+        }
+        
+        if !shouldLoad {
+            await MainActor.run { self.currentModelName = name }
             return
         }
         
@@ -32,11 +71,13 @@ class WhisperModelManager: ObservableObject {
         do {
             print("[WhisperModelManager] Loading model: \(name)")
             let config = WhisperKitConfig(model: name)
-            // This initializer will download the model if needed.
             let newPipe = try await WhisperKit(config)
             
+            queue.async(flags: .barrier) {
+                self.models[name] = .loaded(pipe: newPipe, inUseCount: 1)
+            }
+            
             await MainActor.run {
-                self.pipe = newPipe
                 self.isModelLoading = false
             }
             print("[WhisperModelManager] Model loaded successfully")
@@ -50,9 +91,55 @@ class WhisperModelManager: ObservableObject {
         }
     }
     
-    /// Pre-check if model is available locally (if API allows).
-    /// For now, we rely on loadModel to handle checks.
+    func releaseModel(_ name: String) {
+        queue.async(flags: .barrier) {
+            guard let instance = self.models[name] else { return }
+            
+            if case .loaded(let p, let count) = instance {
+                if count > 1 {
+                    self.models[name] = .loaded(pipe: p, inUseCount: count - 1)
+                } else {
+                    self.models[name] = .cached(pipe: p, lastUsed: Date())
+                }
+            }
+        }
+    }
+    
+    func releaseCachedModels() {
+        queue.async(flags: .barrier) {
+            for (name, instance) in self.models {
+                if case .cached = instance {
+                    print("[WhisperModelManager] Releasing cached model: \(name)")
+                    self.models[name] = .unloaded
+                }
+            }
+        }
+    }
+    
+    func cleanupExpiredModels() {
+        let now = Date()
+        queue.async(flags: .barrier) {
+            for (name, instance) in self.models {
+                if case .cached(_, let lastUsed) = instance {
+                    if now.timeIntervalSince(lastUsed) > self.cacheTimeout {
+                        print("[WhisperModelManager] Cleaning up expired model: \(name)")
+                        self.models[name] = .unloaded
+                    }
+                }
+            }
+        }
+    }
+    
     func isModelLoaded(_ name: String) -> Bool {
-        return pipe != nil && currentModelName == name
+        var isLoaded = false
+        queue.sync {
+            if let instance = models[name] {
+                switch instance {
+                case .loaded, .cached: isLoaded = true
+                default: isLoaded = false
+                }
+            }
+        }
+        return isLoaded
     }
 }

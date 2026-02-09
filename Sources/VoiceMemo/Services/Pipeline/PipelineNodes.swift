@@ -226,6 +226,15 @@ class PollingNode: PipelineNode {
             }
         }
         
+        if status == "RUNNING", let data = data {
+            if data["provider"] as? String == "localWhisper" || data.keys.contains("segments") {
+                let transcriptText = TranscriptParser.buildTranscriptText(from: data)
+                board.updateChannel(channelId) {
+                    $0.transcript = TingwuResult(text: transcriptText, summary: nil)
+                }
+            }
+        }
+        
         if status == "SUCCESS" || status == "COMPLETED" {
             // Determine if this is Tingwu (has "Result" key with URLs) or Volcengine (direct "result" key)
             if let result = data?["Result"] as? [String: Any] {
@@ -264,12 +273,29 @@ class PollingNode: PipelineNode {
                      $0.conversationData = nil
                      $0.rawData = rawData
                  }
+            } else if data?["provider"] as? String == "localWhisper" {
+                 // --- Local Whisper Logic ---
+                 // Direct parsing from the data object
+                 if let data = data {
+                     let transcriptText = TranscriptParser.buildTranscriptText(from: data)
+                     let rawData = await fetchRawData(from: data, service: services.transcriptionService)
+                     let transcriptData = await fetchRawData(from: data, service: services.transcriptionService)
+                     
+                     board.updateChannel(channelId) {
+                         $0.transcript = TingwuResult(text: transcriptText, summary: nil)
+                         $0.overviewData = nil
+                         $0.transcriptData = transcriptData
+                         $0.conversationData = nil
+                         $0.rawData = rawData
+                     }
+                 }
             }
         } else if status == "FAILED" {
             let errorMsg = (data?["StatusText"] as? String) 
                 ?? (data?["_OuterMessage"] as? String)
                 ?? (data?["Message"] as? String)
                 ?? (data?["Code"] as? String)
+                ?? (data?["error"] as? String)
                 ?? "Unknown cloud error"
             
             // Debug logging

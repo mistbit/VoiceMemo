@@ -19,7 +19,8 @@ VoiceMemo 采用**多提供商 ASR 架构**，通过 `TranscriptionService` 协�
 - 02-audio-capture-and-merge.zh-CN.md
 - 03-pipeline-asr-oss.zh-CN.md
 - 04-storage-and-settings.zh-CN.md
-- 05-permissions-and-signing.zh-CN.md
-- 06-testing.zh-CN.md
+- 05-local-whisper-integration.zh-CN.md
+- 06-permissions-and-signing.zh-CN.md
+- 07-testing.zh-CN.md
 - 08-import-guide.zh-CN.md
 - 09-security-and-audit.zh-CN.md

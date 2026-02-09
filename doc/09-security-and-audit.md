@@ -44,7 +44,7 @@ Accounts:
 
 ## Permissions and Entitlements
 
-Permissions required for core functionality are documented in: `doc/05-permissions-and-signing.md`.
+Permissions required for core functionality are documented in: `doc/06-permissions-and-signing.md`.
 
 Audit focus:
 

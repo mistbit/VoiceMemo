@@ -52,6 +52,27 @@ struct LocalInferenceSettingsView: View {
                     .foregroundColor(.red)
                     .font(.caption)
             }
+            
+            Divider()
+            
+            Text("Debug Tools")
+                .font(.headline)
+            
+            Toggle("Save Intermediate Audio", isOn: $settings.debugSaveIntermediateAudio)
+                .toggleStyle(.checkbox)
+            Text("Saves preprocessed audio (16kHz mono) to temporary folder")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Toggle("Export Raw Results", isOn: $settings.debugExportRawResults)
+                .toggleStyle(.checkbox)
+            Text("Saves raw JSON from WhisperKit and FluidAudio before fusion")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                
+            Toggle("Log Model Inference Time", isOn: $settings.debugLogModelTime)
+                .toggleStyle(.checkbox)
+            
         }
         .padding()
         .background(Color(NSColor.controlBackgroundColor))

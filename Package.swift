@@ -12,7 +12,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/aliyun/alibabacloud-oss-swift-sdk-v2.git", from: "0.1.0-beta"),
         .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.14.1"),
-        .package(url: "https://github.com/vapor/mysql-kit.git", from: "4.0.0")
+        .package(url: "https://github.com/vapor/mysql-kit.git", from: "4.0.0"),
+        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.15.0")
     ],
     targets: [
         .executableTarget(
@@ -20,7 +21,8 @@ let package = Package(
             dependencies: [
                 .product(name: "AlibabaCloudOSS", package: "alibabacloud-oss-swift-sdk-v2"),
                 .product(name: "SQLite", package: "SQLite.swift"),
-                .product(name: "MySQLKit", package: "mysql-kit")
+                .product(name: "MySQLKit", package: "mysql-kit"),
+                .product(name: "WhisperKit", package: "WhisperKit")
             ],
             path: "Sources/VoiceMemo",
             exclude: [
@@ -35,6 +37,7 @@ let package = Package(
                 .linkedFramework("CoreMedia"),
                 .linkedFramework("AudioToolbox"),
                 .linkedFramework("CoreAudio"),
+                .linkedFramework("CoreML"),
                 .linkedFramework("AppKit"),
                 .linkedFramework("SwiftUI")
             ]
