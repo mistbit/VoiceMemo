@@ -82,17 +82,44 @@ class WhisperModelManager: ObservableObject, @unchecked Sendable {
     }
     
     func isModelDownloaded(_ name: String) -> Bool {
-        // Simple check: does the snapshots directory contain anything?
-        // This assumes we only download from one repo.
-        // For more precision, we'd need to check for specific model files, but WhisperKit structure is complex.
-        // Given we auto-clean corrupted models, presence usually implies validity.
+        let modelName = formatModelName(name)
         let paths = getPaths()
-        if let snapshotContents = try? FileManager.default.contentsOfDirectory(at: paths.snapshots, includingPropertiesForKeys: nil),
-           !snapshotContents.isEmpty {
-             // To be more precise, we could check if the specific variant is inside, but WhisperKit hashes paths.
-             // We'll trust the snapshot existence for now, as it's better than nothing.
-             return true
+        
+        print("[WhisperModelManager] Checking status for \(name) (variant: \(modelName))...")
+        
+        guard let snapshotContents = try? FileManager.default.contentsOfDirectory(at: paths.snapshots, includingPropertiesForKeys: nil) else {
+             print("[WhisperModelManager] Check \(name): No snapshots directory found at \(paths.snapshots.path)")
+             return false
         }
+        
+        // Iterate through all snapshot directories (usually just one for the main branch)
+        for snapshot in snapshotContents {
+            var isDir: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: snapshot.path, isDirectory: &isDir), isDir.boolValue else { continue }
+            
+            // Search specifically for the model variant folder or file
+            // WhisperKit structure: .../snapshots/<hash>/<variant>/...
+            // So we look for a directory with the variant name
+            
+            // Optimization: First check if a directory with the exact model name exists at the top level of the snapshot
+            let exactPath = snapshot.appendingPathComponent(modelName)
+            if FileManager.default.fileExists(atPath: exactPath.path) {
+                print("[WhisperModelManager] Check \(name): Found exact match at \(exactPath.path)")
+                return true
+            }
+            
+            // Fallback: Recursive search (in case of different structure)
+            if let enumerator = FileManager.default.enumerator(at: snapshot, includingPropertiesForKeys: nil) {
+                while let fileURL = enumerator.nextObject() as? URL {
+                    if fileURL.lastPathComponent == modelName || fileURL.path.contains("/\(modelName)/") {
+                        print("[WhisperModelManager] Check \(name): Found artifact at \(fileURL.path)")
+                        return true
+                    }
+                }
+            }
+        }
+        
+        print("[WhisperModelManager] Check \(name): No artifacts found in snapshots")
         return false
     }
     
@@ -125,6 +152,7 @@ class WhisperModelManager: ObservableObject, @unchecked Sendable {
                 downloadBase: paths.storage,
                 from: "argmaxinc/whisperkit-coreml",
                 progressCallback: { progress in
+                    print("[WhisperModelManager] Download progress: \(progress.fractionCompleted) (completed: \(progress.completedUnitCount), total: \(progress.totalUnitCount))")
                     Task { @MainActor in
                         self.downloadProgress = progress.fractionCompleted
                     }
