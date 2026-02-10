@@ -93,14 +93,57 @@ class WhisperModelManager: ObservableObject, @unchecked Sendable {
                 unsetenv("HF_ENDPOINT")
             }
             
-            if let downloadBase = config.downloadBase {
-                print("[WhisperModelManager] Final Download Base: \(downloadBase.absoluteString)")
-            } else {
-                print("[WhisperModelManager] Final Download Base: nil (Default)")
-            }
-            print("[WhisperModelManager] Model Repo: \(config.modelRepo ?? "nil")")
+            // Set explicit download base to ensure persistence across runs
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let modelStoragePath = appSupport.appendingPathComponent("VoiceMemo/Models")
             
-            let newPipe = try await WhisperKit(config)
+            // Create directory if not exists
+            try? FileManager.default.createDirectory(at: modelStoragePath, withIntermediateDirectories: true)
+            
+            config.downloadBase = modelStoragePath
+            print("[WhisperModelManager] Final Download Base: \(modelStoragePath.path)")
+            print("[WhisperModelManager] Model Repo: \(config.modelRepo ?? "argmaxinc/whisperkit-coreml")")
+            
+            // Try to initialize WhisperKit
+            let newPipe: WhisperKit
+            do {
+                newPipe = try await WhisperKit(config)
+            } catch {
+                // If initialization fails (e.g. timeout) and we suspect we have the model locally, try offline mode
+                print("[WhisperModelManager] Initial load failed: \(error). Checking for local cache...")
+                
+                // Check if we can find the model in the cache
+                // Structure: <base>/models--<org>--<repo>/snapshots/<hash>
+                let repoName = config.modelRepo ?? "argmaxinc/whisperkit-coreml"
+                let repoDirName = "models--" + repoName.replacingOccurrences(of: "/", with: "--")
+                let repoPath = modelStoragePath.appendingPathComponent(repoDirName)
+                
+                let snapshotsPath = repoPath.appendingPathComponent("snapshots")
+                
+                var hasLocalModel = false
+                if let snapshotContents = try? FileManager.default.contentsOfDirectory(at: snapshotsPath, includingPropertiesForKeys: nil),
+                   !snapshotContents.isEmpty {
+                    print("[WhisperModelManager] Found local snapshots: \(snapshotContents.map { $0.lastPathComponent })")
+                    hasLocalModel = true
+                }
+                
+                if hasLocalModel {
+                    print("[WhisperModelManager] Local model found. Retrying in OFFLINE mode...")
+                    setenv("HF_HUB_OFFLINE", "1", 1)
+                    // Re-create config because WhisperKit might have modified it or we want clean state
+                    let offlineConfig = WhisperKitConfig(model: modelName)
+                    offlineConfig.verbose = true
+                    offlineConfig.logLevel = .debug
+                    offlineConfig.downloadBase = modelStoragePath
+                    
+                    newPipe = try await WhisperKit(offlineConfig)
+                    
+                    // Reset OFFLINE mode for future requests
+                    unsetenv("HF_HUB_OFFLINE")
+                } else {
+                    throw error
+                }
+            }
             
             queue.async(flags: .barrier) {
                 self.models[modelName] = .loaded(pipe: newPipe, inUseCount: 1)
