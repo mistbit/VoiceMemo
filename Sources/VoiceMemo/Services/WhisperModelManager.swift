@@ -40,15 +40,22 @@ class WhisperModelManager: ObservableObject, @unchecked Sendable {
     }
     
     func loadModel(_ name: String) async throws {
+        let modelName: String
+        if !name.contains("openai_whisper-") {
+            modelName = "openai_whisper-\(name)"
+        } else {
+            modelName = name
+        }
+        
         // Check if already loaded or cached
         var shouldLoad = false
         queue.sync {
-            if let instance = models[name] {
+            if let instance = models[modelName] {
                 switch instance {
                 case .loaded(let p, let count):
-                    models[name] = .loaded(pipe: p, inUseCount: count + 1)
+                    models[modelName] = .loaded(pipe: p, inUseCount: count + 1)
                 case .cached(let p, _):
-                    models[name] = .loaded(pipe: p, inUseCount: 1)
+                    models[modelName] = .loaded(pipe: p, inUseCount: 1)
                 case .unloaded:
                     shouldLoad = true
                 }
@@ -58,23 +65,45 @@ class WhisperModelManager: ObservableObject, @unchecked Sendable {
         }
         
         if !shouldLoad {
-            await MainActor.run { self.currentModelName = name }
+            await MainActor.run { self.currentModelName = modelName }
             return
         }
         
         await MainActor.run {
             self.isModelLoading = true
             self.loadingError = nil
-            self.currentModelName = name
+            self.currentModelName = modelName
         }
         
         do {
-            print("[WhisperModelManager] Loading model: \(name)")
-            let config = WhisperKitConfig(model: name)
+            print("[WhisperModelManager] Loading model: \(modelName)")
+            
+            let useMirror = UserDefaults.standard.bool(forKey: "useHFMirror")
+            print("[WhisperModelManager] Configuration - Model: \(modelName), UseMirror: \(useMirror)")
+            
+            let config = WhisperKitConfig(model: modelName)
+            config.verbose = true
+            config.logLevel = .debug
+            
+            if useMirror {
+                print("[WhisperModelManager] Using HF Mirror: https://hf-mirror.com")
+                setenv("HF_ENDPOINT", "https://hf-mirror.com", 1)
+            } else {
+                print("[WhisperModelManager] Using Default Source (Hugging Face)")
+                unsetenv("HF_ENDPOINT")
+            }
+            
+            if let downloadBase = config.downloadBase {
+                print("[WhisperModelManager] Final Download Base: \(downloadBase.absoluteString)")
+            } else {
+                print("[WhisperModelManager] Final Download Base: nil (Default)")
+            }
+            print("[WhisperModelManager] Model Repo: \(config.modelRepo ?? "nil")")
+            
             let newPipe = try await WhisperKit(config)
             
             queue.async(flags: .barrier) {
-                self.models[name] = .loaded(pipe: newPipe, inUseCount: 1)
+                self.models[modelName] = .loaded(pipe: newPipe, inUseCount: 1)
             }
             
             await MainActor.run {

@@ -83,6 +83,10 @@ class SettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(whisperModel, forKey: "whisperModel") }
     }
     
+    @Published var useHFMirror: Bool {
+        didSet { UserDefaults.standard.set(useHFMirror, forKey: "useHFMirror") }
+    }
+    
     @Published var language: String {
         didSet { UserDefaults.standard.set(language, forKey: "tingwuLanguage") }
     }
@@ -152,9 +156,8 @@ class SettingsStore: ObservableObject {
         
         self.volcAppId = UserDefaults.standard.string(forKey: "volcAppId") ?? ""
         self.volcResourceId = UserDefaults.standard.string(forKey: "volcResourceId") ?? "volc.bigasr.auc"
-        
         self.whisperModel = UserDefaults.standard.string(forKey: "whisperModel") ?? "base"
-        
+        self.useHFMirror = UserDefaults.standard.bool(forKey: "useHFMirror")
         self.language = UserDefaults.standard.string(forKey: "tingwuLanguage") ?? "cn"
         
         self.enableSummary = UserDefaults.standard.object(forKey: "enableSummary") as? Bool ?? true

@@ -13,6 +13,12 @@ struct LocalInferenceSettingsView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             
+            Toggle("Use HF Mirror (hf-mirror.com)", isOn: $settings.useHFMirror)
+                .toggleStyle(.checkbox)
+            Text("Enable if you have trouble downloading models from Hugging Face.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
             ForEach(modelManager.availableModels, id: \.self) { modelName in
                 HStack {
                     VStack(alignment: .leading) {

@@ -68,6 +68,27 @@ class MeetingPipelineManager: ObservableObject {
     func retry() async {
         settings.log("Retry requested")
         let startStep = task.failedStep ?? .recorded
+        
+        if settings.asrProvider == .localWhisper,
+           startStep == .polling,
+           let lastError = task.lastError,
+           lastError.contains("Task not found") {
+            
+            settings.log("Local Whisper task lost, restarting from creation")
+            
+            let resetTask = task
+            resetTask.tingwuTaskId = nil
+            resetTask.status = .transcoded 
+            resetTask.failedStep = nil
+            resetTask.lastError = nil
+            
+            self.task = resetTask
+            await self.save()
+            
+            await runPipeline(from: .transcoded)
+            return
+        }
+        
         await runPipeline(from: startStep)
     }
     
