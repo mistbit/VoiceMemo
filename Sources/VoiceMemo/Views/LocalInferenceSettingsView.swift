@@ -20,31 +20,62 @@ struct LocalInferenceSettingsView: View {
                 .foregroundColor(.secondary)
             
             ForEach(modelManager.availableModels, id: \.self) { modelName in
+                let isDownloaded = modelManager.downloadedModels.contains(modelName)
+                let isDownloading = modelManager.isDownloading && modelManager.currentModelName.contains(modelName)
+                let isSelected = settings.whisperModel == modelName
+                
                 HStack {
                     VStack(alignment: .leading) {
                         Text(modelName)
-                            .fontWeight(settings.whisperModel == modelName ? .bold : .regular)
+                            .fontWeight(isSelected ? .bold : .regular)
+                        if isDownloaded {
+                            Text("Downloaded")
+                                .font(.caption2)
+                                .foregroundColor(.green)
+                        }
                     }
                     
                     Spacer()
                     
-                    if modelManager.isModelLoading && settings.whisperModel == modelName {
-                        ProgressView()
-                            .scaleEffect(0.5)
-                        Text("Loading...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else if settings.whisperModel == modelName {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text("Active")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    if isDownloading {
+                        VStack(alignment: .trailing) {
+                            ProgressView(value: modelManager.downloadProgress)
+                                .progressViewStyle(.linear)
+                                .frame(width: 100)
+                            Text("\(Int(modelManager.downloadProgress * 100))%")
+                                .font(.caption2)
+                        }
                     } else {
-                        Button("Select") {
-                            settings.whisperModel = modelName
-                            Task {
-                                try? await modelManager.loadModel(modelName)
+                        HStack(spacing: 12) {
+                            if !isDownloaded {
+                                Button("Download") {
+                                    Task {
+                                        try? await modelManager.downloadModel(modelName)
+                                    }
+                                }
+                            }
+                            
+                            if isSelected {
+                                if modelManager.isModelLoading {
+                                    ProgressView()
+                                        .scaleEffect(0.5)
+                                    Text("Loading...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                    Text("Active")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            } else {
+                                Button("Select") {
+                                    settings.whisperModel = modelName
+                                    Task {
+                                        try? await modelManager.loadModel(modelName)
+                                    }
+                                }
                             }
                         }
                     }
@@ -58,6 +89,19 @@ struct LocalInferenceSettingsView: View {
                     .foregroundColor(.red)
                     .font(.caption)
             }
+            
+            HStack {
+                Spacer()
+                Button(action: {
+                    modelManager.deleteModel()
+                }) {
+                    Text("Clear All Local Models")
+                        .foregroundColor(.red)
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+            }
+            .padding(.top, 4)
             
             Divider()
             

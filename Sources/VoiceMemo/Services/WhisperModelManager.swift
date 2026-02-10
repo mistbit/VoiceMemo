@@ -12,6 +12,11 @@ class WhisperModelManager: ObservableObject, @unchecked Sendable {
         "tiny", "base", "small", "medium", "large-v3", "distil-large-v3"
     ]
     
+    // Download progress tracking
+    @Published var downloadProgress: Double = 0.0
+    @Published var isDownloading: Bool = false
+    @Published var downloadedModels: Set<String> = []
+    
     // Public accessor for the current active pipe (for backward compatibility/simplicity)
     var pipe: WhisperKit? {
         get {
@@ -37,20 +42,144 @@ class WhisperModelManager: ObservableObject, @unchecked Sendable {
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.cleanupExpiredModels()
         }
+        
+        // Initial check
+        refreshDownloadedStatus()
     }
     
+    func refreshDownloadedStatus() {
+        // Run on background queue to avoid blocking main thread with file I/O
+        queue.async {
+            var downloaded = Set<String>()
+            for model in self.availableModels {
+                if self.isModelDownloaded(model) {
+                    downloaded.insert(model)
+                }
+            }
+            Task { @MainActor in
+                self.downloadedModels = downloaded
+            }
+        }
+    }
+    
+    private func formatModelName(_ name: String) -> String {
+        if !name.contains("openai_whisper-") {
+            return "openai_whisper-\(name)"
+        }
+        return name
+    }
+    
+    private func getPaths() -> (storage: URL, repo: URL, snapshots: URL) {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let modelStoragePath = appSupport.appendingPathComponent("VoiceMemo/Models")
+        
+        let repoName = "argmaxinc/whisperkit-coreml"
+        let repoDirName = "models--" + repoName.replacingOccurrences(of: "/", with: "--")
+        let repoPath = modelStoragePath.appendingPathComponent(repoDirName)
+        let snapshotsPath = repoPath.appendingPathComponent("snapshots")
+        
+        return (modelStoragePath, repoPath, snapshotsPath)
+    }
+    
+    func isModelDownloaded(_ name: String) -> Bool {
+        // Simple check: does the snapshots directory contain anything?
+        // This assumes we only download from one repo.
+        // For more precision, we'd need to check for specific model files, but WhisperKit structure is complex.
+        // Given we auto-clean corrupted models, presence usually implies validity.
+        let paths = getPaths()
+        if let snapshotContents = try? FileManager.default.contentsOfDirectory(at: paths.snapshots, includingPropertiesForKeys: nil),
+           !snapshotContents.isEmpty {
+             // To be more precise, we could check if the specific variant is inside, but WhisperKit hashes paths.
+             // We'll trust the snapshot existence for now, as it's better than nothing.
+             return true
+        }
+        return false
+    }
+    
+    func downloadModel(_ name: String) async throws {
+        let modelName = formatModelName(name)
+        
+        await MainActor.run {
+            self.isDownloading = true
+            self.downloadProgress = 0.0
+            self.loadingError = nil
+            self.currentModelName = modelName
+        }
+        
+        do {
+            let paths = getPaths()
+            try? FileManager.default.createDirectory(at: paths.storage, withIntermediateDirectories: true)
+            
+            print("[WhisperModelManager] Starting explicit download for: \(modelName)")
+            
+            let useMirror = UserDefaults.standard.bool(forKey: "useHFMirror")
+            if useMirror {
+                print("[WhisperModelManager] Using HF Mirror")
+                setenv("HF_ENDPOINT", "https://hf-mirror.com", 1)
+            } else {
+                unsetenv("HF_ENDPOINT")
+            }
+            
+            _ = try await WhisperKit.download(
+                variant: modelName,
+                downloadBase: paths.storage,
+                from: "argmaxinc/whisperkit-coreml",
+                progressCallback: { progress in
+                    Task { @MainActor in
+                        self.downloadProgress = progress.fractionCompleted
+                    }
+                }
+            )
+            
+            await MainActor.run {
+                self.isDownloading = false
+                self.downloadProgress = 1.0
+            }
+            print("[WhisperModelManager] Download complete for: \(modelName)")
+            
+            // Auto-load after download
+            try await loadModel(name)
+            refreshDownloadedStatus()
+            
+        } catch {
+            print("[WhisperModelManager] Download failed: \(error)")
+            await MainActor.run {
+                self.isDownloading = false
+                self.loadingError = error.localizedDescription
+            }
+            throw error
+        }
+    }
+    
+    func deleteModel() {
+        let paths = getPaths()
+        print("[WhisperModelManager] Deleting all models at: \(paths.repo.path)")
+        
+        if FileManager.default.fileExists(atPath: paths.repo.path) {
+            try? FileManager.default.removeItem(at: paths.repo)
+        }
+        
+        // Also clean global cache to be safe
+        let globalCachePath = paths.storage.appendingPathComponent(".cache/huggingface")
+        if FileManager.default.fileExists(atPath: globalCachePath.path) {
+            try? FileManager.default.removeItem(at: globalCachePath)
+        }
+        
+        // Reset state
+        Task { @MainActor in
+            self.downloadProgress = 0.0
+            self.isDownloading = false
+        }
+        refreshDownloadedStatus()
+    }
+
     func loadModel(_ name: String) async throws {
         // Increase initial retry count to handle timeouts with resumption
         try await loadModel(name, retryCount: 5)
     }
 
     private func loadModel(_ name: String, retryCount: Int) async throws {
-        let modelName: String
-        if !name.contains("openai_whisper-") {
-            modelName = "openai_whisper-\(name)"
-        } else {
-            modelName = name
-        }
+        let modelName = formatModelName(name)
         
         // Check if already loaded or cached
         var shouldLoad = false
@@ -98,15 +227,12 @@ class WhisperModelManager: ObservableObject, @unchecked Sendable {
                 unsetenv("HF_ENDPOINT")
             }
             
-            // Set explicit download base to ensure persistence across runs
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            let modelStoragePath = appSupport.appendingPathComponent("VoiceMemo/Models")
+            // Use helper for paths
+            let paths = getPaths()
+            try? FileManager.default.createDirectory(at: paths.storage, withIntermediateDirectories: true)
             
-            // Create directory if not exists
-            try? FileManager.default.createDirectory(at: modelStoragePath, withIntermediateDirectories: true)
-            
-            config.downloadBase = modelStoragePath
-            print("[WhisperModelManager] Final Download Base: \(modelStoragePath.path)")
+            config.downloadBase = paths.storage
+            print("[WhisperModelManager] Final Download Base: \(paths.storage.path)")
             let repoName = config.modelRepo ?? "argmaxinc/whisperkit-coreml"
             print("[WhisperModelManager] Model Repo: \(repoName)")
             
@@ -122,9 +248,9 @@ class WhisperModelManager: ObservableObject, @unchecked Sendable {
                 let isMetadataError = errorString.contains("Invalid metadata") || errorString.contains("File metadata")
                 
                 // Helper to check for local model existence
-                let repoDirName = "models--" + repoName.replacingOccurrences(of: "/", with: "--")
-                let repoPath = modelStoragePath.appendingPathComponent(repoDirName)
-                let snapshotsPath = repoPath.appendingPathComponent("snapshots")
+                // Use paths from helper
+                let repoPath = paths.repo
+                let snapshotsPath = paths.snapshots
                 
                 var hasLocalModel = false
                 if let snapshotContents = try? FileManager.default.contentsOfDirectory(at: snapshotsPath, includingPropertiesForKeys: nil),
@@ -141,7 +267,7 @@ class WhisperModelManager: ObservableObject, @unchecked Sendable {
                     let offlineConfig = WhisperKitConfig(model: modelName)
                     offlineConfig.verbose = true
                     offlineConfig.logLevel = .debug
-                    offlineConfig.downloadBase = modelStoragePath
+                    offlineConfig.downloadBase = paths.storage
                     
                     defer { unsetenv("HF_HUB_OFFLINE") }
                     newPipe = try await WhisperKit(offlineConfig)
@@ -163,7 +289,7 @@ class WhisperModelManager: ObservableObject, @unchecked Sendable {
                         
                         // If it's a metadata error, also clean up the global .cache/huggingface
                         if isMetadataError {
-                            let globalCachePath = modelStoragePath.appendingPathComponent(".cache/huggingface")
+                            let globalCachePath = paths.storage.appendingPathComponent(".cache/huggingface")
                             if FileManager.default.fileExists(atPath: globalCachePath.path) {
                                 try? FileManager.default.removeItem(at: globalCachePath)
                                 print("[WhisperModelManager] Aggressively deleted global cache: \(globalCachePath.path)")
