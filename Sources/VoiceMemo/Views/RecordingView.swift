@@ -150,9 +150,10 @@ struct RecordingView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "stop.fill")
                                 .font(.title3)
-                            Text("Stop Recording")
+                            Text("Stop Recording (\(formatDuration(recorder.recordingDuration)))")
                                 .font(.headline)
                                 .fontWeight(.bold)
+                                .monospacedDigit()
                         }
                         .foregroundColor(.white)
                         .padding(.vertical, 10)
@@ -197,5 +198,13 @@ struct RecordingView: View {
         }
         }
         .background(Color(nsColor: .windowBackgroundColor)) // Light gray background
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.minute, .second]
+        formatter.unitsStyle = .positional
+        formatter.zeroFormattingBehavior = .pad
+        return formatter.string(from: duration) ?? "00:00"
     }
 }

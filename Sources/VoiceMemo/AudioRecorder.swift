@@ -10,6 +10,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     @Published var availableApps: [SCRunningApplication] = []
     @Published var selectedApp: SCRunningApplication?
     @Published var latestTask: MeetingTask?
+    @Published var recordingDuration: TimeInterval = 0
     
     var lastUploadedURL: URL? {
         if let urlStr = latestTask?.ossUrl {
@@ -19,6 +20,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     }
     
     private var notificationObserver: NSObjectProtocol?
+    private var timer: Timer?
     
     private var settings: SettingsStore
     private var recordingId: String?
@@ -115,6 +117,14 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         isFirstRemoteBuffer = true
         isFirstMicBuffer = true
         self.recordingStartTime = Date()
+        self.recordingDuration = 0
+        
+        DispatchQueue.main.async {
+            self.timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+                guard let self = self, let startTime = self.recordingStartTime else { return }
+                self.recordingDuration = Date().timeIntervalSince(startTime)
+            }
+        }
         
         // Generate URLs
         let formatter = DateFormatter()
@@ -323,6 +333,11 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     
     func stopRecording() {
         Task {
+            await MainActor.run {
+                self.timer?.invalidate()
+                self.timer = nil
+            }
+            
             settings.log("Stop recording")
             // 1. Stop System Audio
             try? await stream?.stopCapture()
