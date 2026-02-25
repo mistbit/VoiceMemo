@@ -1,5 +1,9 @@
 # VoiceMemo
 
+<p align="center">
+  <img src="logo.png" width="200" />
+</p>
+
 A professional, high-fidelity audio recording utility for macOS, designed to capture real-time voice conversations from any application using the native **ScreenCaptureKit** and **AVFoundation** frameworks.
 
 Read this in Chinese: [README_CN.md](README_CN.md)
