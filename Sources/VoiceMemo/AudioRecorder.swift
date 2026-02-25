@@ -275,9 +275,12 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             
             inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, time in
                 guard let self = self else { return }
-                // Dispatch to micQueue to serialize with writer access
-                self.micQueue.async {
-                    self.processMicBuffer(buffer, time: time)
+                // Create CMSampleBuffer synchronously to capture data before buffer invalidation
+                if let sampleBuffer = self.createMicSampleBuffer(from: buffer, time: time) {
+                    // Dispatch to micQueue to serialize with writer access
+                    self.micQueue.async {
+                        self.writeMicBuffer(sampleBuffer)
+                    }
                 }
             }
             
@@ -294,7 +297,20 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         }
     }
     
-    private func processMicBuffer(_ buffer: AVAudioPCMBuffer, time: AVAudioTime) {
+    private func writeMicBuffer(_ sampleBuffer: CMSampleBuffer) {
+        if isFirstMicBuffer {
+            setupMicWriter(for: sampleBuffer)
+            isFirstMicBuffer = false
+        }
+        
+        if let input = micAssetWriterInput, input.isReadyForMoreMediaData {
+            if !input.append(sampleBuffer) {
+                settings.log("Mic append error: \(String(describing: micAssetWriter?.error))")
+            }
+        }
+    }
+    
+    private func createMicSampleBuffer(from buffer: AVAudioPCMBuffer, time: AVAudioTime) -> CMSampleBuffer? {
         let sampleRate = buffer.format.sampleRate
         let effectiveSampleRate: Double
         if sampleRate > 0 {
@@ -321,18 +337,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         }
         micFallbackSampleTime += frameLength
         
-        guard let sampleBuffer = buffer.toCMSampleBuffer(presentationTimeStamp: presentationTime) else { return }
-        
-        if isFirstMicBuffer {
-            setupMicWriter(for: sampleBuffer)
-            isFirstMicBuffer = false
-        }
-        
-        if let input = micAssetWriterInput, input.isReadyForMoreMediaData {
-            if !input.append(sampleBuffer) {
-                settings.log("Mic append error: \(String(describing: micAssetWriter?.error))")
-            }
-        }
+        return buffer.toCMSampleBuffer(presentationTimeStamp: presentationTime)
     }
     
     private func setupMicWriter(for sampleBuffer: CMSampleBuffer) {
@@ -552,16 +557,13 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
 extension AVAudioPCMBuffer {
     func toCMSampleBuffer(presentationTimeStamp: CMTime) -> CMSampleBuffer? {
         let formatDescription = self.format.formatDescription
-        
-        // Create CMSampleBuffer from AudioBufferList
-        // presentationTimeStamp is provided by caller
         let frameCount = CMItemCount(self.frameLength)
-        let bufferListPointer = self.audioBufferList
-        let bufferCount = Int(bufferListPointer.pointee.mNumberBuffers)
-        let totalSize = withUnsafePointer(to: bufferListPointer.pointee.mBuffers) { bufferPtr in
-            let audioBuffers = UnsafeBufferPointer(start: bufferPtr, count: bufferCount)
-            return audioBuffers.reduce(0) { $0 + Int($1.mDataByteSize) }
-        }
+        
+        // Use UnsafeMutableAudioBufferListPointer to safely access all buffers
+        // This avoids copying the AudioBufferList struct which would truncate the variable length array
+        let ablPointer = UnsafeMutableAudioBufferListPointer(self.mutableAudioBufferList)
+        
+        let totalSize = ablPointer.reduce(0) { $0 + Int($1.mDataByteSize) }
         
         var blockBuffer: CMBlockBuffer?
         let blockStatus = CMBlockBufferCreateWithMemoryBlock(
@@ -575,29 +577,23 @@ extension AVAudioPCMBuffer {
             flags: 0,
             blockBufferOut: &blockBuffer
         )
+        
         guard blockStatus == kCMBlockBufferNoErr, let blockBuffer else { return nil }
         
         var offset = 0
-        let copyStatus = withUnsafePointer(to: bufferListPointer.pointee.mBuffers) { bufferPtr -> OSStatus in
-            let audioBuffers = UnsafeBufferPointer(start: bufferPtr, count: bufferCount)
-            for audioBuffer in audioBuffers {
-                if let data = audioBuffer.mData {
-                    let status = CMBlockBufferReplaceDataBytes(
-                        with: data,
-                        blockBuffer: blockBuffer,
-                        offsetIntoDestination: offset,
-                        dataLength: Int(audioBuffer.mDataByteSize)
-                    )
-                    if status != kCMBlockBufferNoErr {
-                        return status
-                    }
+        for audioBuffer in ablPointer {
+            if let data = audioBuffer.mData {
+                let status = CMBlockBufferReplaceDataBytes(
+                    with: data,
+                    blockBuffer: blockBuffer,
+                    offsetIntoDestination: offset,
+                    dataLength: Int(audioBuffer.mDataByteSize)
+                )
+                if status != kCMBlockBufferNoErr {
+                    return nil
                 }
-                offset += Int(audioBuffer.mDataByteSize)
             }
-            return kCMBlockBufferNoErr
-        }
-        if copyStatus != kCMBlockBufferNoErr {
-            return nil
+            offset += Int(audioBuffer.mDataByteSize)
         }
         
         var timingInfo = CMSampleTimingInfo(
