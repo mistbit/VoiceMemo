@@ -261,14 +261,12 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             guard let engine = self.micEngine else { return }
             let inputNode = engine.inputNode
             
-            // Enable Echo Cancellation (Voice Processing I/O)
-            // This tells the system to subtract speaker output from mic input
-            var aecEnabled = false
+            var voiceProcessingEnabled = false
             do {
-                try inputNode.setVoiceProcessingEnabled(true)
-                aecEnabled = true
+                try inputNode.setVoiceProcessingEnabled(false)
+                voiceProcessingEnabled = false
             } catch {
-                self.settings.log("Mic AEC enable failed: \(error.localizedDescription)")
+                self.settings.log("Mic voice processing disable failed: \(error.localizedDescription)")
             }
             
             let format = inputNode.inputFormat(forBus: 0)
@@ -286,10 +284,10 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             
             do {
                 try engine.start()
-                if aecEnabled {
-                    self.settings.log("Mic engine started with AEC enabled")
+                if voiceProcessingEnabled {
+                    self.settings.log("Mic engine started with voice processing enabled")
                 } else {
-                    self.settings.log("Mic engine started without AEC")
+                    self.settings.log("Mic engine started with voice processing disabled")
                 }
             } catch {
                 self.settings.log("Mic engine error: \(error.localizedDescription)")
