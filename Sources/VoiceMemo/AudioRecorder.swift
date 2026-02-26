@@ -2,11 +2,9 @@ import Foundation
 import ScreenCaptureKit
 import AVFoundation
 import AppKit
-import CoreMedia
-import AudioToolbox
 
 @available(macOS 13.0, *)
-class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegate {
+class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     @Published var isRecording = false
     @Published var statusMessage = "Ready to record"
     @Published var availableApps: [SCRunningApplication] = []
@@ -38,14 +36,11 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     private var remoteURL: URL?
     
     // Microphone Audio (Local)
-    private var micEngine: AVAudioEngine?
+    private var micSession: AVCaptureSession?
     private var micAssetWriter: AVAssetWriter?
     private var micAssetWriterInput: AVAssetWriterInput?
     private let micQueue = DispatchQueue(label: "cn.mistbit.voicememo.mic")
     private var isFirstMicBuffer = true
-    private var micStartSampleTime: AVAudioFramePosition?
-    private var micFallbackSampleTime: AVAudioFramePosition = 0
-    private var micSampleRate: Double?
     private var localURL: URL?
     
     init(settings: SettingsStore) {
@@ -121,9 +116,6 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     private func beginRecordingSession(app: SCRunningApplication) {
         isFirstRemoteBuffer = true
         isFirstMicBuffer = true
-        micStartSampleTime = nil
-        micFallbackSampleTime = 0
-        micSampleRate = nil
         self.recordingStartTime = Date()
         self.recordingDuration = 0
         
@@ -253,85 +245,29 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         }
     }
     
-    // MARK: - Microphone Audio (AVAudioEngine)
+    // MARK: - Microphone Audio (AVCapture)
     
     private func startMicrophoneCapture() {
         micQueue.async {
-            self.micEngine = AVAudioEngine()
-            guard let engine = self.micEngine else { return }
-            let inputNode = engine.inputNode
+            self.micSession = AVCaptureSession()
+            guard let session = self.micSession else { return }
             
-            // Enable Echo Cancellation (Voice Processing I/O)
-            // This tells the system to subtract speaker output from mic input
-            var aecEnabled = false
-            do {
-                try inputNode.setVoiceProcessingEnabled(true)
-                aecEnabled = true
-            } catch {
-                self.settings.log("Mic AEC enable failed: \(error.localizedDescription)")
+            session.beginConfiguration()
+            guard let micDevice = AVCaptureDevice.default(for: .audio),
+                  let micInput = try? AVCaptureDeviceInput(device: micDevice),
+                  session.canAddInput(micInput) else {
+                self.settings.log("Cannot add mic input")
+                return
             }
+            session.addInput(micInput)
             
-            let format = inputNode.inputFormat(forBus: 0)
-            
-            inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, time in
-                guard let self = self else { return }
-                // Dispatch to micQueue to serialize with writer access
-                self.micQueue.async {
-                    self.processMicBuffer(buffer, time: time)
-                }
+            let output = AVCaptureAudioDataOutput()
+            if session.canAddOutput(output) {
+                session.addOutput(output)
+                output.setSampleBufferDelegate(self, queue: self.micQueue)
             }
-            
-            do {
-                try engine.start()
-                if aecEnabled {
-                    self.settings.log("Mic engine started with AEC enabled")
-                } else {
-                    self.settings.log("Mic engine started without AEC")
-                }
-            } catch {
-                self.settings.log("Mic engine error: \(error.localizedDescription)")
-            }
-        }
-    }
-    
-    private func processMicBuffer(_ buffer: AVAudioPCMBuffer, time: AVAudioTime) {
-        let sampleRate = buffer.format.sampleRate
-        let effectiveSampleRate: Double
-        if sampleRate > 0 {
-            effectiveSampleRate = sampleRate
-        } else {
-            effectiveSampleRate = micSampleRate ?? 48000
-        }
-        if micSampleRate == nil {
-            micSampleRate = effectiveSampleRate
-        }
-        let timescale = Int32(max(1, Int(effectiveSampleRate.rounded())))
-        
-        let frameLength = AVAudioFramePosition(buffer.frameLength)
-        let presentationTime: CMTime
-        if time.isSampleTimeValid && sampleRate > 0 {
-            if micStartSampleTime == nil {
-                micStartSampleTime = time.sampleTime
-            }
-            let base = micStartSampleTime ?? time.sampleTime
-            let offset = max(0, time.sampleTime - base)
-            presentationTime = CMTime(value: CMTimeValue(offset), timescale: timescale)
-        } else {
-            presentationTime = CMTime(value: CMTimeValue(micFallbackSampleTime), timescale: timescale)
-        }
-        micFallbackSampleTime += frameLength
-        
-        guard let sampleBuffer = buffer.toCMSampleBuffer(presentationTimeStamp: presentationTime) else { return }
-        
-        if isFirstMicBuffer {
-            setupMicWriter(for: sampleBuffer)
-            isFirstMicBuffer = false
-        }
-        
-        if let input = micAssetWriterInput, input.isReadyForMoreMediaData {
-            if !input.append(sampleBuffer) {
-                settings.log("Mic append error: \(String(describing: micAssetWriter?.error))")
-            }
+            session.commitConfiguration()
+            session.startRunning()
         }
     }
     
@@ -417,11 +353,8 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             }
             
             // 2. Stop Microphone
-            if let engine = micEngine {
-                engine.stop()
-                engine.inputNode.removeTap(onBus: 0)
-                micEngine = nil
-            }
+            micSession?.stopRunning()
+            micSession = nil
             if let writer = micAssetWriter {
                 if writer.status == .writing {
                     micAssetWriterInput?.markAsFinished()
@@ -547,82 +480,19 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         settings.log("SCStream error: \(error.localizedDescription)")
     }
-}
-
-extension AVAudioPCMBuffer {
-    func toCMSampleBuffer(presentationTimeStamp: CMTime) -> CMSampleBuffer? {
-        let formatDescription = self.format.formatDescription
+    
+    // AVCaptureAudioDataOutputSampleBufferDelegate
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard CMSampleBufferDataIsReady(sampleBuffer) else { return }
         
-        // Create CMSampleBuffer from AudioBufferList
-        // presentationTimeStamp is provided by caller
-        let frameCount = CMItemCount(self.frameLength)
-        let bufferListPointer = self.audioBufferList
-        let bufferCount = Int(bufferListPointer.pointee.mNumberBuffers)
-        let totalSize = withUnsafePointer(to: bufferListPointer.pointee.mBuffers) { bufferPtr in
-            let audioBuffers = UnsafeBufferPointer(start: bufferPtr, count: bufferCount)
-            return audioBuffers.reduce(0) { $0 + Int($1.mDataByteSize) }
+        if isFirstMicBuffer {
+            setupMicWriter(for: sampleBuffer)
+            isFirstMicBuffer = false
         }
-        
-        var blockBuffer: CMBlockBuffer?
-        let blockStatus = CMBlockBufferCreateWithMemoryBlock(
-            allocator: kCFAllocatorDefault,
-            memoryBlock: nil,
-            blockLength: totalSize,
-            blockAllocator: kCFAllocatorDefault,
-            customBlockSource: nil,
-            offsetToData: 0,
-            dataLength: totalSize,
-            flags: 0,
-            blockBufferOut: &blockBuffer
-        )
-        guard blockStatus == kCMBlockBufferNoErr, let blockBuffer else { return nil }
-        
-        var offset = 0
-        let copyStatus = withUnsafePointer(to: bufferListPointer.pointee.mBuffers) { bufferPtr -> OSStatus in
-            let audioBuffers = UnsafeBufferPointer(start: bufferPtr, count: bufferCount)
-            for audioBuffer in audioBuffers {
-                if let data = audioBuffer.mData {
-                    let status = CMBlockBufferReplaceDataBytes(
-                        with: data,
-                        blockBuffer: blockBuffer,
-                        offsetIntoDestination: offset,
-                        dataLength: Int(audioBuffer.mDataByteSize)
-                    )
-                    if status != kCMBlockBufferNoErr {
-                        return status
-                    }
-                }
-                offset += Int(audioBuffer.mDataByteSize)
+        if let input = micAssetWriterInput, input.isReadyForMoreMediaData {
+            if !input.append(sampleBuffer) {
+                settings.log("Mic append error: \(String(describing: micAssetWriter?.error))")
             }
-            return kCMBlockBufferNoErr
         }
-        if copyStatus != kCMBlockBufferNoErr {
-            return nil
-        }
-        
-        var timingInfo = CMSampleTimingInfo(
-            duration: CMTime(value: 1, timescale: CMTimeScale(self.format.sampleRate)),
-            presentationTimeStamp: presentationTimeStamp,
-            decodeTimeStamp: .invalid
-        )
-        
-        var sampleBuffer: CMSampleBuffer?
-        let sampleStatus = CMSampleBufferCreate(
-            allocator: kCFAllocatorDefault,
-            dataBuffer: blockBuffer,
-            dataReady: true,
-            makeDataReadyCallback: nil,
-            refcon: nil,
-            formatDescription: formatDescription,
-            sampleCount: frameCount,
-            sampleTimingEntryCount: 1,
-            sampleTimingArray: &timingInfo,
-            sampleSizeEntryCount: 0,
-            sampleSizeArray: nil,
-            sampleBufferOut: &sampleBuffer
-        )
-        
-        guard sampleStatus == noErr else { return nil }
-        return sampleBuffer
     }
 }
