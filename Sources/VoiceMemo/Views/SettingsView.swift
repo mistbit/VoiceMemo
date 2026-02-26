@@ -188,6 +188,18 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                         .padding(.leading, 8)
                 }
+
+                Divider()
+
+                FormRow(label: "Voice Processing") {
+                    Toggle("Enable Voice Processing", isOn: $settings.enableVoiceProcessing)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                    Text("Echo cancellation and auto gain")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.leading, 8)
+                }
             }
             
             StyledGroupBox("AI Analysis") {

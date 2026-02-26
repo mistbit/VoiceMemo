@@ -261,12 +261,24 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             guard let engine = self.micEngine else { return }
             let inputNode = engine.inputNode
             
-            var voiceProcessingEnabled = false
+            var voiceProcessingEnabled = self.settings.enableVoiceProcessing
             do {
-                try inputNode.setVoiceProcessingEnabled(false)
-                voiceProcessingEnabled = false
+                if voiceProcessingEnabled {
+                    try inputNode.setVoiceProcessingEnabled(true)
+                    
+                    // 第一次配置，尽量在 Tap 安装前生效
+                    self.configureVoiceProcessingUnit(inputNode: inputNode)
+                } else {
+                    try inputNode.setVoiceProcessingEnabled(false)
+                }
             } catch {
-                self.settings.log("Mic voice processing disable failed: \(error.localizedDescription)")
+                self.settings.log("Mic voice processing change failed: \(error.localizedDescription)")
+                // Fallback
+                try? inputNode.setVoiceProcessingEnabled(false)
+                voiceProcessingEnabled = false
+                DispatchQueue.main.async {
+                    self.settings.enableVoiceProcessing = false
+                }
             }
             
             let format = inputNode.inputFormat(forBus: 0)
@@ -286,6 +298,10 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                 try engine.start()
                 if voiceProcessingEnabled {
                     self.settings.log("Mic engine started with voice processing enabled")
+                    // 二次尝试配置 Ducking/AGC，防止启动时被重置
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+                        self.configureVoiceProcessingUnit(inputNode: inputNode)
+                    }
                 } else {
                     self.settings.log("Mic engine started with voice processing disabled")
                 }
@@ -293,6 +309,53 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                 self.settings.log("Mic engine error: \(error.localizedDescription)")
             }
         }
+    }
+    
+    private func configureVoiceProcessingUnit(inputNode: AVAudioInputNode) {
+        guard let audioUnit = inputNode.audioUnit else {
+            self.settings.log("Mic voice processing: AudioUnit not available")
+            return
+        }
+        
+        var propSize = UInt32(MemoryLayout<UInt32>.size)
+        var ducking: UInt32 = 0 // 0 = Disable
+        var agc: UInt32 = 0 // 0 = Disable
+        
+        // Ducking
+        let duckingPropID: AudioUnitPropertyID = 2102 // kAUVoiceIOProperty_DuckNonVoiceAudio
+        var currentDucking: UInt32 = 0
+        AudioUnitGetProperty(audioUnit, duckingPropID, kAudioUnitScope_Global, 0, &currentDucking, &propSize)
+        self.settings.log("Mic voice processing: Initial Ducking = \(currentDucking)")
+        
+        let duckResult = AudioUnitSetProperty(
+            audioUnit,
+            duckingPropID,
+            kAudioUnitScope_Global,
+            0,
+            &ducking,
+            propSize
+        )
+        
+        AudioUnitGetProperty(audioUnit, duckingPropID, kAudioUnitScope_Global, 0, &currentDucking, &propSize)
+        self.settings.log("Mic voice processing: Final Ducking = \(currentDucking) (Set result: \(duckResult))")
+        
+        // AGC
+        let agcPropID: AudioUnitPropertyID = 2101 // kAUVoiceIOProperty_VoiceProcessingEnableAGC
+        var currentAGC: UInt32 = 0
+        AudioUnitGetProperty(audioUnit, agcPropID, kAudioUnitScope_Global, 0, &currentAGC, &propSize)
+        self.settings.log("Mic voice processing: Initial AGC = \(currentAGC)")
+        
+        let agcResult = AudioUnitSetProperty(
+            audioUnit,
+            agcPropID,
+            kAudioUnitScope_Global,
+            0,
+            &agc,
+            propSize
+        )
+        
+        AudioUnitGetProperty(audioUnit, agcPropID, kAudioUnitScope_Global, 0, &currentAGC, &propSize)
+        self.settings.log("Mic voice processing: Final AGC = \(currentAGC) (Set result: \(agcResult))")
     }
     
     private func writeMicBuffer(_ sampleBuffer: CMSampleBuffer) {

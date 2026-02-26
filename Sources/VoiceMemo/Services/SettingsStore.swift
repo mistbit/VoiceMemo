@@ -94,6 +94,9 @@ class SettingsStore: ObservableObject {
     @Published var enableRoleSplit: Bool {
         didSet { UserDefaults.standard.set(enableRoleSplit, forKey: "enableRoleSplit") }
     }
+    @Published var enableVoiceProcessing: Bool {
+        didSet { UserDefaults.standard.set(enableVoiceProcessing, forKey: "enableVoiceProcessing") }
+    }
     @Published var speakerCount: Int {
         didSet { UserDefaults.standard.set(speakerCount, forKey: "speakerCount") }
     }
@@ -150,6 +153,7 @@ class SettingsStore: ObservableObject {
         self.enableKeyPoints = UserDefaults.standard.object(forKey: "enableKeyPoints") as? Bool ?? true
         self.enableActionItems = UserDefaults.standard.object(forKey: "enableActionItems") as? Bool ?? true
         self.enableRoleSplit = UserDefaults.standard.object(forKey: "enableRoleSplit") as? Bool ?? true
+        self.enableVoiceProcessing = UserDefaults.standard.object(forKey: "enableVoiceProcessing") as? Bool ?? false
         let spkCount = UserDefaults.standard.integer(forKey: "speakerCount")
         self.speakerCount = (spkCount == 0) ? 2 : spkCount
         self.enableVerboseLogging = UserDefaults.standard.object(forKey: "enableVerboseLogging") as? Bool ?? false
