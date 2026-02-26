@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct ResultView: View {
     let task: MeetingTask
     let settings: SettingsStore
+    @ObservedObject var playback: AudioPlaybackController
     @State private var selectedTab: ResultTab = .overview
     @Namespace private var animationNamespace
     
@@ -16,9 +17,10 @@ struct ResultView: View {
         var id: String { self.rawValue }
     }
     
-    init(task: MeetingTask, settings: SettingsStore) {
+    init(task: MeetingTask, settings: SettingsStore, playback: AudioPlaybackController) {
         self.task = task
         self.settings = settings
+        self.playback = playback
         // Default to Pipeline if task is not completed
         if task.status != .completed {
             _selectedTab = State(initialValue: .pipeline)
@@ -98,7 +100,7 @@ struct ResultView: View {
                 case .raw:
                     RawDataView(text: task.rawData ?? task.rawResponse ?? "No raw response.")
                 case .pipeline:
-                    PipelineView(task: task, settings: settings) {
+                    PipelineView(task: task, settings: settings, playback: playback) {
                         withAnimation {
                             selectedTab = .overview
                         }

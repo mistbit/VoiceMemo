@@ -3,6 +3,7 @@ import SwiftUI
 struct PipelineView: View {
     @StateObject var manager: MeetingPipelineManager
     private let settings: SettingsStore
+    @ObservedObject var playback: AudioPlaybackController
     @State private var showingResult = false
     
     // Rerun interaction
@@ -12,8 +13,9 @@ struct PipelineView: View {
     // Callback for navigation
     var onViewResult: (() -> Void)?
     
-    init(task: MeetingTask, settings: SettingsStore, onViewResult: (() -> Void)? = nil) {
+    init(task: MeetingTask, settings: SettingsStore, playback: AudioPlaybackController, onViewResult: (() -> Void)? = nil) {
         self.settings = settings
+        self.playback = playback
         self.onViewResult = onViewResult
         _manager = StateObject(wrappedValue: MeetingPipelineManager(task: task, settings: settings))
     }
@@ -23,7 +25,7 @@ struct PipelineView: View {
             // Pipeline Steps
             HStack(spacing: 0) {
                 // Record Step (Not interactive for rerun)
-                StepView(title: "Record", icon: "mic.fill", isActive: false, isCompleted: true, isFailed: false)
+                recordStepView
                 
                 ArrowView()
                 
@@ -62,6 +64,13 @@ struct PipelineView: View {
                     actionButton
                         .controlSize(.large)
                 }
+                
+                if FileManager.default.fileExists(atPath: manager.task.localFilePath) {
+                    Divider()
+                        .padding(.vertical, 8)
+                    
+                    playbackControlView
+                }
             }
             
             if manager.task.status == .completed {
@@ -95,6 +104,93 @@ struct PipelineView: View {
     }
     
     // MARK: - Helpers
+    
+    private func formatTime(_ time: TimeInterval) -> String {
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    @ViewBuilder
+    private var playbackControlView: some View {
+        let isCurrentTask = playback.playingTaskId == manager.task.id
+        let isPlaying = playback.isPlaying && isCurrentTask
+        let duration = isCurrentTask ? playback.duration : 0
+        let currentTime = isCurrentTask ? playback.currentTime : 0
+        
+        VStack(spacing: 12) {
+            // Timeline
+            HStack(spacing: 8) {
+                Text(formatTime(currentTime))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundColor(.secondary)
+                    .frame(width: 40, alignment: .leading)
+                
+                Slider(value: Binding(
+                    get: { currentTime },
+                    set: { newValue in
+                        if isCurrentTask {
+                            playback.seek(to: newValue)
+                        }
+                    }
+                ), in: 0...max(duration, 0.1))
+                .disabled(!isCurrentTask)
+                
+                Text(formatTime(duration))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundColor(.secondary)
+                    .frame(width: 40, alignment: .trailing)
+            }
+            
+            // Controls
+            HStack(spacing: 32) {
+                Button(action: {
+                    if isCurrentTask {
+                        playback.seek(to: currentTime - 15)
+                    }
+                }) {
+                    Image(systemName: "gobackward.15")
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+                .disabled(!isCurrentTask)
+
+                Button(action: {
+                    playback.toggle(task: manager.task)
+                }) {
+                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.accentColor)
+                }
+                .buttonStyle(.plain)
+                
+                Button(action: {
+                    if isCurrentTask {
+                        playback.seek(to: currentTime + 15)
+                    }
+                }) {
+                    Image(systemName: "goforward.15")
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+                .disabled(!isCurrentTask)
+            }
+        }
+        .padding()
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        .cornerRadius(12)
+        .padding(.top, 8)
+    }
+
+    @ViewBuilder
+    private var recordStepView: some View {
+        VStack(spacing: 4) {
+            StepView(title: "Record", icon: "mic.fill", isActive: false, isCompleted: true, isFailed: false)
+                .frame(width: 80)
+        }
+    }
     
     @ViewBuilder
     private func stepButton(title: String, icon: String, step: MeetingTaskStatus) -> some View {

@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct HistoryListView: View {
     @ObservedObject var store: HistoryStore
+    @ObservedObject var playback: AudioPlaybackController
     @Binding var selectedTask: MeetingTask?
     
     @State private var searchText = ""
@@ -53,7 +54,7 @@ struct HistoryListView: View {
                 List(selection: $selectedTask) {
                     ForEach(filteredTasks) { task in
                         NavigationLink(value: task) {
-                            HistoryRow(task: task)
+                            HistoryRow(task: task, playback: playback)
                         }
                         .contextMenu {
                             Button {
@@ -145,6 +146,7 @@ struct EmptyStateView: View {
 
 struct HistoryRow: View {
     let task: MeetingTask
+    @ObservedObject var playback: AudioPlaybackController
     
     private var formattedDuration: String {
         let formatter = RelativeDateTimeFormatter()
@@ -153,23 +155,42 @@ struct HistoryRow: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label {
-                Text(task.title)
-                    .foregroundColor(.primary)
-            } icon: {
-                Image(systemName: "waveform")
-                    .foregroundColor(.blue)
+        let canPlay = FileManager.default.fileExists(atPath: task.localFilePath)
+        let isPlayingThis = playback.isPlaying && playback.playingTaskId == task.id
+        
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Label {
+                    Text(task.title)
+                        .foregroundColor(.primary)
+                } icon: {
+                    Image(systemName: "waveform")
+                        .foregroundColor(.blue)
+                }
+                
+                HStack(spacing: 6) {
+                    Text(formattedDuration)
+                    Text("•")
+                    Text(task.status.displayName)
+                        .foregroundColor(task.status.color)
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
             }
             
-            HStack(spacing: 6) {
-                Text(formattedDuration)
-                Text("•")
-                Text(task.status.displayName)
-                    .foregroundColor(task.status.color)
+            Spacer(minLength: 0)
+            
+            if canPlay {
+                Button(action: {
+                    playback.toggle(task: task)
+                }) {
+                    Image(systemName: isPlayingThis ? "stop.fill" : "play.fill")
+                        .foregroundColor(.accentColor)
+                        .padding(6)
+                        .background(Circle().fill(Color.accentColor.opacity(0.15)))
+                }
+                .buttonStyle(.plain)
             }
-            .font(.caption)
-            .foregroundColor(.secondary)
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())

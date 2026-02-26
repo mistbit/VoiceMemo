@@ -4,13 +4,14 @@ import AVFoundation
 import AppKit
 
 @available(macOS 13.0, *)
-class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
+class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegate, AVCaptureAudioDataOutputSampleBufferDelegate, AVAudioPlayerDelegate {
     @Published var isRecording = false
     @Published var statusMessage = "Ready to record"
     @Published var availableApps: [SCRunningApplication] = []
     @Published var selectedApp: SCRunningApplication?
     @Published var latestTask: MeetingTask?
     @Published var recordingDuration: TimeInterval = 0
+    @Published var isPlaying = false
     
     var lastUploadedURL: URL? {
         if let urlStr = latestTask?.ossUrl {
@@ -21,6 +22,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     
     private var notificationObserver: NSObjectProtocol?
     private var timer: Timer?
+    private var audioPlayer: AVAudioPlayer?
     
     private var settings: SettingsStore
     private var recordingId: String?
@@ -84,7 +86,9 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         }
     }
     
+    @MainActor
     func startRecording() {
+        stopPlayback()
         guard let app = selectedApp else {
             statusMessage = "Please select an app first"
             return
@@ -331,8 +335,10 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     
     // MARK: - Stop & Merge
     
+    @MainActor
     func stopRecording() {
         Task {
+            stopPlayback()
             await MainActor.run {
                 self.timer?.invalidate()
                 self.timer = nil
@@ -406,6 +412,35 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             micAssetWriter = nil
             micAssetWriterInput = nil
         }
+    }
+
+    @MainActor
+    func playLatestRecording() {
+        guard let path = latestTask?.localFilePath else {
+            statusMessage = "No recording available"
+            return
+        }
+        let url = URL(fileURLWithPath: path)
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.delegate = self
+            player.prepareToPlay()
+            player.play()
+            audioPlayer = player
+            isPlaying = true
+            statusMessage = "Playing latest recording"
+        } catch {
+            isPlaying = false
+            statusMessage = "Play failed: \(error.localizedDescription)"
+            settings.log("Play failed: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    func stopPlayback() {
+        audioPlayer?.stop()
+        audioPlayer = nil
+        isPlaying = false
     }
     
     private func mergeAudioFiles(audio1: URL, audio2: URL, output: URL) async throws {
@@ -493,6 +528,120 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             if !input.append(sampleBuffer) {
                 settings.log("Mic append error: \(String(describing: micAssetWriter?.error))")
             }
+        }
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        Task { @MainActor in
+            isPlaying = false
+        }
+    }
+}
+
+@available(macOS 13.0, *)
+class AudioPlaybackController: NSObject, ObservableObject, AVAudioPlayerDelegate {
+    @Published var isPlaying = false
+    @Published var playingTaskId: UUID?
+    @Published var currentTime: TimeInterval = 0
+    @Published var duration: TimeInterval = 0
+    
+    private var audioPlayer: AVAudioPlayer?
+    private var timer: Timer?
+
+    @MainActor
+    func toggle(task: MeetingTask) {
+        if playingTaskId == task.id {
+            if isPlaying {
+                pause()
+            } else {
+                resume()
+            }
+        } else {
+            play(filePath: task.localFilePath, taskId: task.id)
+        }
+    }
+
+    @MainActor
+    func play(filePath: String, taskId: UUID?) {
+        guard FileManager.default.fileExists(atPath: filePath) else {
+            stop()
+            return
+        }
+        stop() // Stop previous
+        
+        let url = URL(fileURLWithPath: filePath)
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.delegate = self
+            player.prepareToPlay()
+            player.play()
+            
+            audioPlayer = player
+            duration = player.duration
+            isPlaying = true
+            playingTaskId = taskId
+            
+            startTimer()
+        } catch {
+            stop()
+        }
+    }
+    
+    @MainActor
+    func pause() {
+        audioPlayer?.pause()
+        isPlaying = false
+        stopTimer()
+    }
+    
+    @MainActor
+    func resume() {
+        if let player = audioPlayer {
+            player.play()
+            isPlaying = true
+            startTimer()
+        }
+    }
+
+    @MainActor
+    func stop() {
+        audioPlayer?.stop()
+        audioPlayer = nil
+        isPlaying = false
+        playingTaskId = nil
+        currentTime = 0
+        duration = 0
+        stopTimer()
+    }
+    
+    @MainActor
+    func seek(to time: TimeInterval) {
+        guard let player = audioPlayer else { return }
+        player.currentTime = time
+        currentTime = time
+    }
+    
+    private func startTimer() {
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self, let player = self.audioPlayer else { return }
+                self.currentTime = player.currentTime
+            }
+        }
+    }
+    
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        Task { @MainActor in
+            isPlaying = false
+            playingTaskId = nil
+            currentTime = 0
+            stopTimer()
         }
     }
 }

@@ -4,6 +4,7 @@ import ScreenCaptureKit
 struct RecordingView: View {
     @ObservedObject var recorder: AudioRecorder
     @ObservedObject var settings: SettingsStore
+    @ObservedObject var playback: AudioPlaybackController
     var onViewResult: (() -> Void)?
     
     var body: some View {
@@ -121,28 +122,32 @@ struct RecordingView: View {
 
                 // Action Button
                 if !recorder.isRecording {
-                    Button(action: {
-                        recorder.startRecording()
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "record.circle")
-                                .font(.title3)
-                            Text("Record")
-                                .font(.headline)
-                                .fontWeight(.bold)
+                    VStack(spacing: 12) {
+                        Button(action: {
+                            playback.stop()
+                            recorder.startRecording()
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "record.circle")
+                                    .font(.title3)
+                                Text("Record")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                            }
+                            .foregroundColor(.white)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 40)
+                            .background(
+                                Capsule()
+                                    .fill(Color.red)
+                                    .shadow(color: Color.red.opacity(0.3), radius: 5, x: 0, y: 3)
+                            )
                         }
-                        .foregroundColor(.white)
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 40)
-                        .background(
-                            Capsule()
-                                .fill(Color.red)
-                                .shadow(color: Color.red.opacity(0.3), radius: 5, x: 0, y: 3)
-                        )
+                        .buttonStyle(.plain)
+                        .disabled(recorder.selectedApp == nil)
+                        .keyboardShortcut("R", modifiers: .command)
+                        
                     }
-                    .buttonStyle(.plain)
-                    .disabled(recorder.selectedApp == nil)
-                    .keyboardShortcut("R", modifiers: .command)
                 } else {
                     Button(action: {
                         recorder.stopRecording()
@@ -178,7 +183,7 @@ struct RecordingView: View {
                             StatusBadge(status: task.status)
                         }
                         
-                        PipelineView(task: task, settings: settings, onViewResult: onViewResult)
+                        PipelineView(task: task, settings: settings, playback: playback, onViewResult: onViewResult)
                             .id(task.id)
                             .padding(16)
                             .background(Color(nsColor: .textBackgroundColor))
