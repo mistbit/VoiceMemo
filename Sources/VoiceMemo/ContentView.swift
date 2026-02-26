@@ -5,6 +5,7 @@ struct ContentView: View {
     @ObservedObject var settings: SettingsStore
     @StateObject private var recorder: AudioRecorder
     @StateObject private var historyStore = HistoryStore()
+    @StateObject private var playback = AudioPlaybackController()
     
     // Navigation State
     @State private var selectedSidebarItem: SidebarItem? = .history
@@ -71,7 +72,7 @@ struct ContentView: View {
                         .navigationTitle("Import")
                         
                     case .history:
-                        HistoryListView(store: historyStore, selectedTask: $selectedTask)
+                        HistoryListView(store: historyStore, playback: playback, selectedTask: $selectedTask)
                             .navigationTitle("History")
                         
                     case .settings:
@@ -98,7 +99,7 @@ struct ContentView: View {
             if let item = selectedSidebarItem {
                 switch item {
                 case .recording:
-                    RecordingView(recorder: recorder, settings: settings, onViewResult: {
+                    RecordingView(recorder: recorder, settings: settings, playback: playback, onViewResult: {
                         if let task = recorder.latestTask {
                             navigateToTask(task)
                         }
@@ -128,7 +129,7 @@ struct ContentView: View {
                     
                 case .history:
                     if let task = selectedTask {
-                        ResultView(task: task, settings: settings)
+                        ResultView(task: task, settings: settings, playback: playback)
                             .id(task.id)
                     } else {
                         Text("Select a meeting to view details")
