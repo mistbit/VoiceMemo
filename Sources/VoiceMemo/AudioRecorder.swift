@@ -1,17 +1,16 @@
 import Foundation
-import ScreenCaptureKit
+@preconcurrency import ScreenCaptureKit
 import AVFoundation
 import AppKit
 
 @available(macOS 13.0, *)
-class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegate, AVCaptureAudioDataOutputSampleBufferDelegate, AVAudioPlayerDelegate {
+class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegate, AVCaptureAudioDataOutputSampleBufferDelegate, @unchecked Sendable {
     @Published var isRecording = false
     @Published var statusMessage = "Ready to record"
     @Published var availableApps: [SCRunningApplication] = []
     @Published var selectedApp: SCRunningApplication?
     @Published var latestTask: MeetingTask?
     @Published var recordingDuration: TimeInterval = 0
-    @Published var isPlaying = false
     
     var lastUploadedURL: URL? {
         if let urlStr = latestTask?.ossUrl {
@@ -22,7 +21,6 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     
     private var notificationObserver: NSObjectProtocol?
     private var timer: Timer?
-    private var audioPlayer: AVAudioPlayer?
     
     private var settings: SettingsStore
     private var recordingId: String?
@@ -88,25 +86,31 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     
     @MainActor
     func startRecording() {
-        stopPlayback()
+        NotificationCenter.default.post(name: .playbackShouldStop, object: nil)
         guard let app = selectedApp else {
             statusMessage = "Please select an app first"
             return
         }
+        let appName = app.applicationName
+        let appProcessID = app.processID
         
         statusMessage = "Requesting permissions..."
-        settings.log("Start recording: app=\(app.applicationName)")
+        settings.log("Start recording: app=\(appName)")
         
         // Request Mic Permission first
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
-            self.beginRecordingSession(app: app)
+            beginRecordingSession(appName: appName, appProcessID: appProcessID)
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .audio) { granted in
                 if granted {
-                    DispatchQueue.main.async { self.beginRecordingSession(app: app) }
+                    Task { @MainActor in
+                        self.beginRecordingSession(appName: appName, appProcessID: appProcessID)
+                    }
                 } else {
-                    DispatchQueue.main.async { self.statusMessage = "Microphone permission denied" }
+                    Task { @MainActor in
+                        self.statusMessage = "Microphone permission denied"
+                    }
                 }
             }
         case .denied, .restricted:
@@ -117,7 +121,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         }
     }
     
-    private func beginRecordingSession(app: SCRunningApplication) {
+    private func beginRecordingSession(appName: String, appProcessID: pid_t) {
         isFirstRemoteBuffer = true
         isFirstMicBuffer = true
         self.recordingStartTime = Date()
@@ -153,7 +157,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         }
         
         // Start System Audio Capture (SCK)
-        startSystemAudioCapture(app: app)
+        startSystemAudioCapture(appName: appName, appProcessID: appProcessID)
         
         // Start Microphone Capture (AVCapture)
         startMicrophoneCapture()
@@ -166,11 +170,14 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     
     // MARK: - System Audio (SCK)
     
-    private func startSystemAudioCapture(app: SCRunningApplication) {
+    private func startSystemAudioCapture(appName: String, appProcessID: pid_t) {
         Task {
             do {
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                guard let matchedApp = content.applications.first(where: { $0.processID == app.processID }) else { return }
+                guard let matchedApp = content.applications.first(where: { $0.processID == appProcessID }) else {
+                    settings.log("SCK start error: target app not found \(appName) \(appProcessID)")
+                    return
+                }
                 
                 let filter = SCContentFilter(display: content.displays.first!, including: [matchedApp], exceptingWindows: [])
                 let config = SCStreamConfiguration()
@@ -338,7 +345,6 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     @MainActor
     func stopRecording() {
         Task {
-            stopPlayback()
             await MainActor.run {
                 self.timer?.invalidate()
                 self.timer = nil
@@ -414,34 +420,6 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         }
     }
 
-    @MainActor
-    func playLatestRecording() {
-        guard let path = latestTask?.localFilePath else {
-            statusMessage = "No recording available"
-            return
-        }
-        let url = URL(fileURLWithPath: path)
-        do {
-            let player = try AVAudioPlayer(contentsOf: url)
-            player.delegate = self
-            player.prepareToPlay()
-            player.play()
-            audioPlayer = player
-            isPlaying = true
-            statusMessage = "Playing latest recording"
-        } catch {
-            isPlaying = false
-            statusMessage = "Play failed: \(error.localizedDescription)"
-            settings.log("Play failed: \(error.localizedDescription)")
-        }
-    }
-
-    @MainActor
-    func stopPlayback() {
-        audioPlayer?.stop()
-        audioPlayer = nil
-        isPlaying = false
-    }
     
     private func mergeAudioFiles(audio1: URL, audio2: URL, output: URL) async throws {
         let composition = AVMutableComposition()
@@ -531,11 +509,6 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         }
     }
 
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor in
-            isPlaying = false
-        }
-    }
 }
 
 @available(macOS 13.0, *)
@@ -544,9 +517,32 @@ class AudioPlaybackController: NSObject, ObservableObject, AVAudioPlayerDelegate
     @Published var playingTaskId: UUID?
     @Published var currentTime: TimeInterval = 0
     @Published var duration: TimeInterval = 0
+    @Published var lastErrorMessage: String?
     
     private var audioPlayer: AVAudioPlayer?
     private var timer: Timer?
+    private var stopPlaybackObserver: NSObjectProtocol?
+
+    override init() {
+        super.init()
+        stopPlaybackObserver = NotificationCenter.default.addObserver(
+            forName: .playbackShouldStop,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.stop()
+            }
+        }
+    }
+
+    deinit {
+        if let observer = stopPlaybackObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        timer?.invalidate()
+        timer = nil
+    }
 
     @MainActor
     func toggle(task: MeetingTask) {
@@ -564,6 +560,7 @@ class AudioPlaybackController: NSObject, ObservableObject, AVAudioPlayerDelegate
     @MainActor
     func play(filePath: String, taskId: UUID?) {
         guard FileManager.default.fileExists(atPath: filePath) else {
+            lastErrorMessage = "Audio file not found"
             stop()
             return
         }
@@ -580,9 +577,11 @@ class AudioPlaybackController: NSObject, ObservableObject, AVAudioPlayerDelegate
             duration = player.duration
             isPlaying = true
             playingTaskId = taskId
+            lastErrorMessage = nil
             
             startTimer()
         } catch {
+            lastErrorMessage = error.localizedDescription
             stop()
         }
     }
