@@ -144,7 +144,7 @@ struct RecordingView: View {
                             )
                         }
                         .buttonStyle(.plain)
-                        .disabled(recorder.selectedApp == nil)
+                        .disabled(settings.recordingMode != .localOnly && recorder.selectedApp == nil)
                         .keyboardShortcut("R", modifiers: .command)
                         
                     }

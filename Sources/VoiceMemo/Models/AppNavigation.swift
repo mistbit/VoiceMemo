@@ -29,24 +29,32 @@ enum SidebarItem: String, Hashable, CaseIterable, Identifiable {
 
 enum RecordingModeItem: String, Hashable, CaseIterable, Identifiable {
     case mixed
+    case remoteOnly
+    case localOnly
     
     var id: String { rawValue }
     
     var title: String {
         switch self {
         case .mixed: return "Mixed Mode"
+        case .remoteOnly: return "Remote Only"
+        case .localOnly: return "Local Only"
         }
     }
     
     var description: String {
         switch self {
         case .mixed: return "Merges system and microphone audio automatically."
+        case .remoteOnly: return "Records system audio only."
+        case .localOnly: return "Records microphone only."
         }
     }
     
     var icon: String {
         switch self {
         case .mixed: return "arrow.triangle.merge"
+        case .remoteOnly: return "speaker.wave.2"
+        case .localOnly: return "mic"
         }
     }
 }

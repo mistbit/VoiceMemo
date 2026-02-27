@@ -21,6 +21,7 @@ struct ContentView: View {
     init(settings: SettingsStore) {
         self.settings = settings
         _recorder = StateObject(wrappedValue: AudioRecorder(settings: settings))
+        _selectedRecordingMode = State(initialValue: RecordingModeItem(rawValue: settings.recordingMode.rawValue) ?? .mixed)
     }
     
     // Method to navigate to a task in history
@@ -152,6 +153,14 @@ struct ContentView: View {
         .frame(minWidth: 1000, minHeight: 600)
         .onChange(of: recorder.latestTask?.id) { _ in
             Task { await historyStore.refresh() }
+        }
+        .onChange(of: selectedRecordingMode) { newValue in
+            if let newValue {
+                settings.recordingMode = SettingsStore.RecordingMode(rawValue: newValue.rawValue) ?? .mixed
+            }
+        }
+        .onChange(of: settings.recordingMode) { newValue in
+            selectedRecordingMode = RecordingModeItem(rawValue: newValue.rawValue) ?? .mixed
         }
         .alert("Import Failed", isPresented: Binding(
             get: { importError != nil },

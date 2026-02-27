@@ -4,7 +4,7 @@ import AVFoundation
 import AppKit
 
 @available(macOS 13.0, *)
-class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegate, AVCaptureAudioDataOutputSampleBufferDelegate, @unchecked Sendable {
+class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     @Published var isRecording = false
     @Published var statusMessage = "Ready to record"
     @Published var availableApps: [SCRunningApplication] = []
@@ -36,11 +36,11 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
     private var remoteURL: URL?
     
     // Microphone Audio (Local)
-    private var micSession: AVCaptureSession?
-    private var micAssetWriter: AVAssetWriter?
-    private var micAssetWriterInput: AVAssetWriterInput?
+    private var micEngine: AVAudioEngine?
+    private var micFile: AVAudioFile?
+    private var micInputFormat: AVAudioFormat?
     private let micQueue = DispatchQueue(label: "cn.mistbit.voicememo.mic")
-    private var isFirstMicBuffer = true
+    private var micTapInstalled = false
     private var localURL: URL?
     
     init(settings: SettingsStore) {
@@ -83,47 +83,65 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             self.statusMessage = "Failed to load apps: \(error.localizedDescription)"
         }
     }
+
+    private var recordingMode: SettingsStore.RecordingMode {
+        settings.recordingMode
+    }
+
+    private var usesSystemAudio: Bool {
+        recordingMode != .localOnly
+    }
+
+    private var usesMicrophone: Bool {
+        recordingMode != .remoteOnly
+    }
     
     @MainActor
     func startRecording() {
         NotificationCenter.default.post(name: .playbackShouldStop, object: nil)
-        guard let app = selectedApp else {
-            statusMessage = "Please select an app first"
-            return
+        var appName = "Local Only"
+        var appProcessID: pid_t = 0
+        if usesSystemAudio {
+            guard let app = selectedApp else {
+                statusMessage = "Please select an app first"
+                return
+            }
+            appName = app.applicationName
+            appProcessID = app.processID
         }
-        let appName = app.applicationName
-        let appProcessID = app.processID
         
         statusMessage = "Requesting permissions..."
-        settings.log("Start recording: app=\(appName)")
+        settings.log("Start recording: app=\(appName) mode=\(recordingMode.rawValue)")
         
-        // Request Mic Permission first
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized:
-            beginRecordingSession(appName: appName, appProcessID: appProcessID)
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .audio) { granted in
-                if granted {
-                    Task { @MainActor in
-                        self.beginRecordingSession(appName: appName, appProcessID: appProcessID)
-                    }
-                } else {
-                    Task { @MainActor in
-                        self.statusMessage = "Microphone permission denied"
+        if usesMicrophone {
+            switch AVCaptureDevice.authorizationStatus(for: .audio) {
+            case .authorized:
+                beginRecordingSession(appName: appName, appProcessID: appProcessID)
+            case .notDetermined:
+                AVCaptureDevice.requestAccess(for: .audio) { granted in
+                    if granted {
+                        Task { @MainActor in
+                            self.beginRecordingSession(appName: appName, appProcessID: appProcessID)
+                        }
+                    } else {
+                        Task { @MainActor in
+                            self.statusMessage = "Microphone permission denied"
+                        }
                     }
                 }
+            case .denied, .restricted:
+                statusMessage = "Microphone permission denied"
+                return
+            @unknown default:
+                return
             }
-        case .denied, .restricted:
-            statusMessage = "Microphone permission denied"
-            return
-        @unknown default:
-            return
+        } else {
+            beginRecordingSession(appName: appName, appProcessID: appProcessID)
         }
     }
     
     private func beginRecordingSession(appName: String, appProcessID: pid_t) {
         isFirstRemoteBuffer = true
-        isFirstMicBuffer = true
         self.recordingStartTime = Date()
         self.recordingDuration = 0
         
@@ -150,21 +168,41 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         
-        self.remoteURL = folder.appendingPathComponent("recording-\(dateStr)-remote.m4a")
-        self.localURL = folder.appendingPathComponent("recording-\(dateStr)-local.m4a")
-        if let recordingId, let remoteURL, let localURL {
-            settings.log("Recording session: id=\(recordingId) remote=\(remoteURL.path) local=\(localURL.path)")
+        switch recordingMode {
+        case .mixed:
+            self.remoteURL = folder.appendingPathComponent("recording-\(dateStr)-remote.m4a")
+            self.localURL = folder.appendingPathComponent("recording-\(dateStr)-local.m4a")
+            if let recordingId, let remoteURL, let localURL {
+                settings.log("Recording session: id=\(recordingId) remote=\(remoteURL.path) local=\(localURL.path)")
+            }
+            startSystemAudioCapture(appName: appName, appProcessID: appProcessID)
+            startMicrophoneCapture()
+        case .remoteOnly:
+            self.remoteURL = folder.appendingPathComponent("recording-\(dateStr)-remote.m4a")
+            self.localURL = nil
+            if let recordingId, let remoteURL {
+                settings.log("Recording session: id=\(recordingId) remote=\(remoteURL.path)")
+            }
+            startSystemAudioCapture(appName: appName, appProcessID: appProcessID)
+        case .localOnly:
+            self.remoteURL = nil
+            self.localURL = folder.appendingPathComponent("recording-\(dateStr)-local.m4a")
+            if let recordingId, let localURL {
+                settings.log("Recording session: id=\(recordingId) local=\(localURL.path)")
+            }
+            startMicrophoneCapture()
         }
-        
-        // Start System Audio Capture (SCK)
-        startSystemAudioCapture(appName: appName, appProcessID: appProcessID)
-        
-        // Start Microphone Capture (AVCapture)
-        startMicrophoneCapture()
         
         DispatchQueue.main.async {
             self.isRecording = true
-            self.statusMessage = "Recording (Remote + Local)..."
+            switch self.recordingMode {
+            case .mixed:
+                self.statusMessage = "Recording (Remote + Local)..."
+            case .remoteOnly:
+                self.statusMessage = "Recording (Remote Only)..."
+            case .localOnly:
+                self.statusMessage = "Recording (Local Only)..."
+            }
         }
     }
     
@@ -256,87 +294,82 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         }
     }
     
-    // MARK: - Microphone Audio (AVCapture)
+    // MARK: - Microphone Audio (AVAudioEngine)
     
     private func startMicrophoneCapture() {
         micQueue.async {
-            self.micSession = AVCaptureSession()
-            guard let session = self.micSession else { return }
-            
-            session.beginConfiguration()
-            guard let micDevice = AVCaptureDevice.default(for: .audio),
-                  let micInput = try? AVCaptureDeviceInput(device: micDevice),
-                  session.canAddInput(micInput) else {
-                self.settings.log("Cannot add mic input")
-                return
-            }
-            session.addInput(micInput)
-            
-            let output = AVCaptureAudioDataOutput()
-            if session.canAddOutput(output) {
-                session.addOutput(output)
-                output.setSampleBufferDelegate(self, queue: self.micQueue)
-            }
-            session.commitConfiguration()
-            session.startRunning()
-        }
-    }
-    
-    private func setupMicWriter(for sampleBuffer: CMSampleBuffer) {
-        guard let url = localURL,
-              let formatDesc = CMSampleBufferGetFormatDescription(sampleBuffer),
-              let streamDesc = CMAudioFormatDescriptionGetStreamBasicDescription(formatDesc) else { return }
-        
-        do {
+            guard let url = self.localURL else { return }
             if FileManager.default.fileExists(atPath: url.path) {
                 try? FileManager.default.removeItem(at: url)
             }
             
-            micAssetWriter = try AVAssetWriter(outputURL: url, fileType: .m4a)
+            let engine = AVAudioEngine()
+            let inputNode = engine.inputNode
             
-            let sampleRate = streamDesc.pointee.mSampleRate
-            let channels = Int(streamDesc.pointee.mChannelsPerFrame)
-            
-            self.settings.log("Setup mic writer: rate=\(sampleRate), channels=\(channels)")
-            
-            if sampleRate <= 0 || channels <= 0 {
-                self.settings.log("Invalid mic audio format: rate or channels is 0")
-                return
+            if self.settings.echoCancellationEnabled {
+                do {
+                    try inputNode.setVoiceProcessingEnabled(true)
+                    self.settings.log("Mic voice processing enabled")
+                } catch {
+                    self.settings.log("Mic voice processing unavailable: \(error.localizedDescription)")
+                }
             }
-
-            // AAC encoder is picky. 44100 or 48000 are best.
-            let targetSampleRate: Double
-            if sampleRate == 44100 || sampleRate == 48000 || sampleRate == 32000 || sampleRate == 24000 || sampleRate == 16000 {
-                targetSampleRate = sampleRate
-            } else {
-                targetSampleRate = 48000
-                self.settings.log("Non-standard mic sample rate \(sampleRate), using 48000 for AAC")
-            }
-
+            
+            let inputFormat = inputNode.outputFormat(forBus: 0)
+            
             let audioSettings: [String: Any] = [
                 AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-                AVSampleRateKey: targetSampleRate,
-                AVNumberOfChannelsKey: channels,
+                AVSampleRateKey: inputFormat.sampleRate,
+                AVNumberOfChannelsKey: Int(inputFormat.channelCount),
                 AVEncoderBitRateKey: 128000,
                 AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
             ]
             
-            micAssetWriterInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings, sourceFormatHint: formatDesc)
-            micAssetWriterInput?.expectsMediaDataInRealTime = true
-            
-            if let writer = micAssetWriter, let input = micAssetWriterInput, writer.canAdd(input) {
-                writer.add(input)
-                if writer.startWriting() {
-                    writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
-                    self.settings.log("Mic writer started successfully at rate \(targetSampleRate)")
-                } else {
-                    self.settings.log("Mic writer failed to startWriting: \(String(describing: writer.error))")
+            do {
+                let file = try AVAudioFile(forWriting: url, settings: audioSettings)
+                inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
+                    do {
+                        try file.write(from: buffer)
+                    } catch {
+                        self?.settings.log("Mic write error: \(error.localizedDescription)")
+                    }
                 }
-            } else {
-                self.settings.log("Mic writer cannot add input")
+                self.micTapInstalled = true
+                engine.prepare()
+                try engine.start()
+                
+                self.micEngine = engine
+                self.micFile = file
+                self.micInputFormat = inputFormat
+                self.settings.log("Mic engine started: rate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount)")
+            } catch {
+                self.settings.log("Mic engine start error: \(error.localizedDescription)")
             }
-        } catch {
-            settings.log("Mic writer error: \(error.localizedDescription)")
+        }
+    }
+    
+    private func stopMicrophoneCapture() async {
+        await withCheckedContinuation { continuation in
+            micQueue.async { [weak self] in
+                guard let self = self else {
+                    continuation.resume()
+                    return
+                }
+                
+                if let engine = self.micEngine {
+                    if self.micTapInstalled {
+                        engine.inputNode.removeTap(onBus: 0)
+                        self.micTapInstalled = false
+                    }
+                    if engine.isRunning {
+                        engine.stop()
+                    }
+                }
+                self.micEngine = nil
+                self.micFile = nil
+                self.micInputFormat = nil
+                continuation.resume()
+            }
         }
     }
     
@@ -365,20 +398,10 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             }
             
             // 2. Stop Microphone
-            micSession?.stopRunning()
-            micSession = nil
-            if let writer = micAssetWriter {
-                if writer.status == .writing {
-                    micAssetWriterInput?.markAsFinished()
-                    await writer.finishWriting()
-                    settings.log("Mic writer finished. Final status: \(writer.status.rawValue)")
-                } else {
-                    settings.log("Mic writer was not writing. Status: \(writer.status.rawValue), Error: \(String(describing: writer.error))")
-                }
-            }
+            await stopMicrophoneCapture()
             
             // 3. Merge
-            if let rURL = remoteURL, let lURL = localURL, let recId = recordingId {
+            if let rURL = remoteURL, let lURL = localURL {
                 settings.log("Merge start: remote=\(rURL.path) local=\(lURL.path)")
                 await MainActor.run { self.statusMessage = "Merging audio files..." }
                 let mixedURL = rURL.deletingLastPathComponent().appendingPathComponent(rURL.lastPathComponent.replacingOccurrences(of: "remote", with: "mixed"))
@@ -388,14 +411,15 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                         self.isRecording = false
                         self.statusMessage = "Saved to \(mixedURL.deletingLastPathComponent().lastPathComponent)"
                         
-                        // Create Meeting Task
-                        let formatter = DateFormatter()
-                        formatter.dateFormat = "MM-dd HH:mm"
-                        let dateStr = formatter.string(from: self.recordingStartTime ?? Date())
-                        let title = "Rec \(dateStr)"
-                        let task = MeetingTask(recordingId: recId, localFilePath: mixedURL.path, title: title)
-                        Task { try? await StorageManager.shared.currentProvider.saveTask(task) }
-                        self.latestTask = task
+                        if let recId = self.recordingId {
+                            let formatter = DateFormatter()
+                            formatter.dateFormat = "MM-dd HH:mm"
+                            let dateStr = formatter.string(from: self.recordingStartTime ?? Date())
+                            let title = "Rec \(dateStr)"
+                            let task = MeetingTask(recordingId: recId, localFilePath: mixedURL.path, title: title)
+                            Task { try? await StorageManager.shared.currentProvider.saveTask(task) }
+                            self.latestTask = task
+                        }
                     }
                     settings.log("Merge success: mixed=\(mixedURL.path)")
                 } catch {
@@ -404,6 +428,27 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                         self.statusMessage = "Merge failed: \(error.localizedDescription)"
                     }
                     settings.log("Merge failed: \(error.localizedDescription)")
+                }
+            } else if let finalURL = remoteURL ?? localURL {
+                await MainActor.run {
+                    self.isRecording = false
+                    self.statusMessage = "Saved to \(finalURL.deletingLastPathComponent().lastPathComponent)"
+                    
+                    if let recId = self.recordingId {
+                        let formatter = DateFormatter()
+                        formatter.dateFormat = "MM-dd HH:mm"
+                        let dateStr = formatter.string(from: self.recordingStartTime ?? Date())
+                        let title = "Rec \(dateStr)"
+                        let task = MeetingTask(recordingId: recId, localFilePath: finalURL.path, title: title)
+                        Task { try? await StorageManager.shared.currentProvider.saveTask(task) }
+                        self.latestTask = task
+                    }
+                }
+                settings.log("Recording saved: url=\(finalURL.path)")
+            } else {
+                await MainActor.run {
+                    self.isRecording = false
+                    self.statusMessage = "No audio captured"
                 }
             }
             
@@ -415,8 +460,6 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             
             remoteAssetWriter = nil
             remoteAssetWriterInput = nil
-            micAssetWriter = nil
-            micAssetWriterInput = nil
         }
     }
 
@@ -494,21 +537,6 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
         settings.log("SCStream error: \(error.localizedDescription)")
     }
     
-    // AVCaptureAudioDataOutputSampleBufferDelegate
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard CMSampleBufferDataIsReady(sampleBuffer) else { return }
-        
-        if isFirstMicBuffer {
-            setupMicWriter(for: sampleBuffer)
-            isFirstMicBuffer = false
-        }
-        if let input = micAssetWriterInput, input.isReadyForMoreMediaData {
-            if !input.append(sampleBuffer) {
-                settings.log("Mic append error: \(String(describing: micAssetWriter?.error))")
-            }
-        }
-    }
-
 }
 
 @available(macOS 13.0, *)

@@ -178,6 +178,18 @@ struct SettingsView: View {
                 }
                 
                 Divider()
+
+                FormRow(label: "Echo Cancel") {
+                    Toggle("Enable Echo Cancellation", isOn: $settings.echoCancellationEnabled)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                    Text("Reduce speaker echo in mic recording")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.leading, 8)
+                }
+                
+                Divider()
                 
                 FormRow(label: "Role Split") {
                     Toggle("Enable Role Split", isOn: $settings.enableRoleSplit)
