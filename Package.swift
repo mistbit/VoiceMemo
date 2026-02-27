@@ -33,7 +33,6 @@ let package = Package(
                 .linkedFramework("ScreenCaptureKit"),
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("CoreMedia"),
-                .linkedFramework("AudioToolbox"),
                 .linkedFramework("CoreAudio"),
                 .linkedFramework("AppKit"),
                 .linkedFramework("SwiftUI")

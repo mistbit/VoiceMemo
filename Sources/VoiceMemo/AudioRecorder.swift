@@ -305,16 +305,6 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
             
             let engine = AVAudioEngine()
             let inputNode = engine.inputNode
-            
-            if self.settings.echoCancellationEnabled {
-                do {
-                    try inputNode.setVoiceProcessingEnabled(true)
-                    self.settings.log("Mic voice processing enabled")
-                } catch {
-                    self.settings.log("Mic voice processing unavailable: \(error.localizedDescription)")
-                }
-            }
-            
             let inputFormat = inputNode.outputFormat(forBus: 0)
             
             let audioSettings: [String: Any] = [

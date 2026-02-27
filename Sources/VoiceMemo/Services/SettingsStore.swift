@@ -111,9 +111,6 @@ class SettingsStore: ObservableObject {
     @Published var recordingMode: RecordingMode {
         didSet { UserDefaults.standard.set(recordingMode.rawValue, forKey: "recordingMode") }
     }
-    @Published var echoCancellationEnabled: Bool {
-        didSet { UserDefaults.standard.set(echoCancellationEnabled, forKey: "echoCancellationEnabled") }
-    }
     
     // Audio Recording Config
     @Published var savePathBookmark: Data? {
@@ -168,7 +165,6 @@ class SettingsStore: ObservableObject {
         self.speakerCount = (spkCount == 0) ? 2 : spkCount
         self.enableVerboseLogging = UserDefaults.standard.object(forKey: "enableVerboseLogging") as? Bool ?? false
         self.recordingMode = RecordingMode(rawValue: UserDefaults.standard.string(forKey: "recordingMode") ?? "mixed") ?? .mixed
-        self.echoCancellationEnabled = UserDefaults.standard.object(forKey: "echoCancellationEnabled") as? Bool ?? true
         self.savePathBookmark = UserDefaults.standard.data(forKey: "savePathBookmark")
         self.useKeychain = UserDefaults.standard.object(forKey: "useKeychain") as? Bool ?? true
         
