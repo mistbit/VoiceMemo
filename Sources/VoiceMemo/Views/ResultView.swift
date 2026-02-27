@@ -6,6 +6,8 @@ struct ResultView: View {
     let settings: SettingsStore
     @ObservedObject var playback: AudioPlaybackController
     @State private var selectedTab: ResultTab = .overview
+    @State private var isSendingEmail = false
+    @State private var emailStatus: String?
     @Namespace private var animationNamespace
     
     enum ResultTab: String, CaseIterable, Identifiable {
@@ -43,6 +45,23 @@ struct ResultView: View {
                     }
                     
                     Spacer()
+                    
+                    if settings.enableEmailNotification && task.status == .completed {
+                        Button(action: {
+                            Task { await sendEmail() }
+                        }) {
+                            HStack(spacing: 4) {
+                                if isSendingEmail {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: "envelope")
+                                }
+                                Text(emailStatus ?? "Email")
+                            }
+                        }
+                        .disabled(isSendingEmail)
+                        .help("Send meeting summary via email")
+                    }
                     
                     Button(action: exportMarkdown) {
                         Label("Export", systemImage: "square.and.arrow.up")
@@ -110,6 +129,40 @@ struct ResultView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .textBackgroundColor))
         }
+    }
+    
+    private func sendEmail() async {
+        isSendingEmail = true
+        emailStatus = "Sending..."
+        
+        // Generate Markdown
+        let mdContent = generateMarkdown()
+        let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent("\(task.title).md")
+        
+        do {
+            try mdContent.write(to: tempUrl, atomically: true, encoding: .utf8)
+            
+            let emailService = EmailService(settings: settings)
+            try await emailService.sendEmail(
+                subject: "Meeting Summary: \(task.title)",
+                body: "Please find the attached meeting summary.",
+                attachmentPath: tempUrl.path
+            )
+            emailStatus = "Sent"
+        } catch {
+            emailStatus = "Failed"
+            // Show error in a more prominent way if needed, or just log
+            print("Failed to send email: \(error.localizedDescription)")
+        }
+        
+        // Clean up
+        try? FileManager.default.removeItem(at: tempUrl)
+        
+        isSendingEmail = false
+        
+        // Reset status after a delay
+        try? await Task.sleep(nanoseconds: 3 * 1_000_000_000)
+        emailStatus = nil
     }
     
     private func exportMarkdown() {

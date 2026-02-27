@@ -123,6 +123,8 @@ class MeetingPipelineManager: ObservableObject {
         
         await MainActor.run { self.isProcessing = true }
         
+        var isChainCompleted = true
+        
         for node in nodes {
             // Update UI status to "Running"
             await updateStatus(node.step, isFailed: false)
@@ -147,53 +149,114 @@ class MeetingPipelineManager: ObservableObject {
                             retryCount += 1
                             if retryCount > PipelineConstants.maxPollingRetries {
                                 await updateStatus(.failed, step: node.step, error: "Polling timeout", isFailed: true)
+                                isChainCompleted = false
                                 return
                             }
                             try? await Task.sleep(nanoseconds: PipelineConstants.pollingInterval)
                             continue
                         case .channelNotFound(let id):
                             await updateStatus(.failed, step: node.step, error: "Channel \(id) not found", isFailed: true)
+                            isChainCompleted = false
                             return
                         case .inputMissing(let msg):
                             await updateStatus(.failed, step: node.step, error: "Input missing: \(msg)", isFailed: true)
+                            isChainCompleted = false
                             return
                         case .transcodeFailed:
                             await updateStatus(.failed, step: node.step, error: "Transcoding failed", isFailed: true)
+                            isChainCompleted = false
                             return
                         case .cloudError(let msg):
                             await updateStatus(.failed, step: node.step, error: "Cloud service error: \(msg)", isFailed: true)
+                            isChainCompleted = false
                             return
                         case .taskFailed(let msg):
                             await updateStatus(.failed, step: node.step, error: "Task failed: \(msg)", isFailed: true)
+                            isChainCompleted = false
                             return
                         }
                     }
                     
                     if let transcriptionError = error as? TranscriptionError {
-                        await updateStatus(.failed, step: node.step, error: formatTranscriptionError(transcriptionError), isFailed: true)
+                        await updateStatus(.failed, step: node.step, error: "Transcription Error: \(transcriptionError.localizedDescription)", isFailed: true)
+                        isChainCompleted = false
                         return
                     }
                     
-                    // Backward compatibility: handle non-PipelineError NSError
-                    let nsError = error as NSError
-                    if nsError.code == 202 {
-                        retryCount += 1
-                        if retryCount > PipelineConstants.maxPollingRetries {
-                            await updateStatus(.failed, step: node.step, error: "Polling timeout", isFailed: true)
-                            return
-                        }
-                        try? await Task.sleep(nanoseconds: PipelineConstants.pollingInterval)
-                        continue
-                    }
-                    
-                    // Unknown error
                     await updateStatus(.failed, step: node.step, error: error.localizedDescription, isFailed: true)
+                    isChainCompleted = false
                     return
                 }
             }
         }
         
         await MainActor.run { self.isProcessing = false }
+        
+        // Post-processing: Send Email
+        if isChainCompleted && settings.enableEmailNotification {
+            await sendEmailNotification()
+        }
+    }
+    
+    private func sendEmailNotification() async {
+        await MainActor.run { self.isProcessing = true }
+        
+        // Generate Markdown
+        let mdContent = generateMarkdownForEmail()
+        let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent("\(task.title).md")
+        
+        do {
+            try mdContent.write(to: tempUrl, atomically: true, encoding: .utf8)
+            
+            let emailService = EmailService(settings: settings)
+            try await emailService.sendEmail(
+                subject: "Meeting Summary: \(task.title)",
+                body: "Please find the attached meeting summary.",
+                attachmentPath: tempUrl.path
+            )
+            settings.log("Email sent successfully to \(settings.recipientEmail)")
+        } catch {
+            settings.log("Failed to send email: \(error.localizedDescription)")
+            await MainActor.run {
+                self.errorMessage = "Email failed: \(error.localizedDescription)"
+            }
+        }
+        
+        // Clean up
+        try? FileManager.default.removeItem(at: tempUrl)
+        
+        await MainActor.run { self.isProcessing = false }
+    }
+    
+    private func generateMarkdownForEmail() -> String {
+        var md = "# \(task.title)\n\n"
+        md += "Date: \(task.createdAt)\n\n"
+        
+        // Metadata
+        md += "## Task Info\n"
+        if let key = task.taskKey { md += "- Task Key: \(key)\n" }
+        if let status = task.apiStatus { md += "- Status: \(status)\n" }
+        if let duration = task.bizDuration { md += "- Duration: \(duration / 1000)s\n" }
+        if let mp3 = task.outputMp3Path { md += "- Audio: [Download](\(mp3))\n" }
+        md += "\n"
+        
+        if let summary = task.summary {
+            md += "## Summary\n\(summary)\n\n"
+        }
+        
+        if let keyPoints = task.keyPoints {
+            md += "## Key Points\n\(keyPoints)\n\n"
+        }
+        
+        if let actionItems = task.actionItems {
+            md += "## Action Items\n\(actionItems)\n\n"
+        }
+        
+        if let transcript = task.transcript {
+            md += "## Transcript\n\(transcript)\n"
+        }
+        
+        return md
     }
     
     // MARK: - Hydration & Persistence

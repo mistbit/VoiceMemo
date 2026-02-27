@@ -2,6 +2,12 @@ import SwiftUI
 import AppKit
 
 struct SettingsView: View {
+    private enum SettingsCategory: String, CaseIterable {
+        case general, asr, oss, storage, logs, email
+    }
+    
+    // MARK: - Properties
+    
     @ObservedObject var settings: SettingsStore
     @ObservedObject var storageManager = StorageManager.shared
     var category: SettingsCategory?
@@ -14,6 +20,8 @@ struct SettingsView: View {
     @State private var mysqlPasswordInput: String = ""
     @State private var testStatus: String = ""
     @State private var mysqlTestStatus: String = ""
+    @State private var fastmailTokenInput: String = ""
+    @State private var emailTestStatus: String = ""
     @State private var showingLog = false
     
     init(settings: SettingsStore, category: SettingsCategory? = nil) {
@@ -34,6 +42,8 @@ struct SettingsView: View {
                         ossForm
                     case .storage:
                         storageForm
+                    case .email:
+                        emailForm
                     case .logs:
                         logsForm
                     }
@@ -43,6 +53,7 @@ struct SettingsView: View {
                         asrForm.tabItem { Text("ASR") }
                         ossForm.tabItem { Text("OSS") }
                         storageForm.tabItem { Text("Storage") }
+                        emailForm.tabItem { Text("Email") }
                         logsForm.tabItem { Text("Logs") }
                     }
                 }
@@ -591,6 +602,72 @@ struct SettingsView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+        }
+    }
+    
+    private var emailForm: some View {
+        VStack(spacing: Layout.standardSpacing) {
+            StyledGroupBox("FastMail Gateway") {
+                FormRow(label: "Enable") {
+                    Toggle("Enable Email Notification", isOn: $settings.enableEmailNotification)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                    Spacer()
+                }
+                
+                if settings.enableEmailNotification {
+                    FormRow(label: "Gateway URL") {
+                        TextField("e.g. http://localhost:8080", text: $settings.fastmailUrl)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    FormRow(label: "Recipient") {
+                        TextField("Email address", text: $settings.recipientEmail)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    FormRow(label: "Token") {
+                        CredentialRow(
+                            hasValue: settings.hasFastmailToken,
+                            input: $fastmailTokenInput,
+                            placeholder: "Bearer Token",
+                            isSecure: true,
+                            onSave: { settings.saveFastmailToken(fastmailTokenInput) },
+                            onClear: { settings.clearFastmailSecrets() }
+                        )
+                    }
+                    
+                    Divider()
+                    
+                    FormRow(label: "Actions") {
+                        HStack {
+                            Button("Test Email") {
+                                Task { await testEmail() }
+                            }
+                            if !emailTestStatus.isEmpty {
+                                Text(emailTestStatus)
+                                    .font(.caption)
+                                    .foregroundColor(emailTestStatus.contains("Success") ? .green : .red)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func testEmail() async {
+        emailTestStatus = "Testing..."
+        let service = EmailService(settings: settings)
+        do {
+            try await service.sendEmail(
+                subject: "Test Email from VoiceMemo",
+                body: "This is a test email to verify your configuration.",
+                attachmentPath: nil
+            )
+            emailTestStatus = "Success: Email sent"
+        } catch {
+            emailTestStatus = "Failed: \(error.localizedDescription)"
         }
     }
     
