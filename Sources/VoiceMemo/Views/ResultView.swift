@@ -135,9 +135,9 @@ struct ResultView: View {
         isSendingEmail = true
         emailStatus = "Sending..."
         
-        // Generate Markdown
-        let mdContent = generateMarkdown()
-        let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent("\(task.title).md")
+        let mdContent = task.markdownSummary()
+        let filename = task.safeFilename().appending(".md")
+        let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
         
         do {
             try mdContent.write(to: tempUrl, atomically: true, encoding: .utf8)
@@ -151,16 +151,13 @@ struct ResultView: View {
             emailStatus = "Sent"
         } catch {
             emailStatus = "Failed"
-            // Show error in a more prominent way if needed, or just log
-            print("Failed to send email: \(error.localizedDescription)")
+            settings.log("Email failed: \(error.localizedDescription)")
         }
         
-        // Clean up
         try? FileManager.default.removeItem(at: tempUrl)
         
         isSendingEmail = false
         
-        // Reset status after a delay
         try? await Task.sleep(nanoseconds: 3 * 1_000_000_000)
         emailStatus = nil
     }
@@ -168,75 +165,15 @@ struct ResultView: View {
     private func exportMarkdown() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
-        panel.nameFieldStringValue = "\(task.title).md"
+        panel.nameFieldStringValue = "\(task.safeFilename()).md"
         
         panel.begin { response in
             if response == .OK, let url = panel.url {
-                let content = generateMarkdown()
+                let content = task.markdownSummary()
                 try? content.write(to: url, atomically: true, encoding: .utf8)
             }
         }
     }
-    
-    private func generateMarkdown() -> String {
-        var md = "# \(task.title)\n\n"
-        md += "Date: \(task.createdAt)\n\n"
-        
-        // Metadata
-        md += "## Task Info\n"
-        if let key = task.taskKey { md += "- Task Key: \(key)\n" }
-        if let status = task.apiStatus { md += "- Status: \(status)\n" }
-        if let error = task.statusText, !error.isEmpty { md += "- Message: \(error)\n" }
-        if let duration = task.bizDuration { md += "- Duration: \(duration / 1000)s\n" }
-        if let mp3 = task.outputMp3Path { md += "- Audio: [Download](\(mp3))\n" }
-        md += "\n"
-        
-        if let summary = task.summary {
-            md += "## Summary\n\(summary)\n\n"
-        }
-        
-        if let keyPoints = task.keyPoints {
-            md += "## Key Points\n\(keyPoints)\n\n"
-        }
-        
-        if let actionItems = task.actionItems {
-            md += "## Action Items\n\(actionItems)\n\n"
-        }
-        
-        if let transcript = derivedTranscript() {
-            md += "## Transcript\n\(transcript)\n"
-        }
-        
-        return md
-    }
-    
-    private func derivedTranscript() -> String? {
-        if let transcript = task.transcript, !transcript.isEmpty {
-            return transcript
-        }
-        
-        // Try to parse from transcriptData (full JSON from DB)
-        if let dataStr = task.transcriptData,
-           let data = dataStr.data(using: .utf8),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let text = TranscriptParser.buildTranscriptText(from: json) {
-                return text
-            }
-        }
-        
-        // Fallback to parsing rawResponse using TranscriptParser
-        guard let raw = task.rawResponse,
-              let data = raw.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-        
-        return TranscriptParser.buildTranscriptText(from: json)
-    }
-    
-    // extractTranscript, extractText, extractSpeaker and stringify helper methods are no longer needed
-    // as all parsing logic is now centralized in TranscriptParser
-    // and derivedTranscript() delegates entirely to TranscriptParser.
 
 }
 

@@ -2,10 +2,6 @@ import SwiftUI
 import AppKit
 
 struct SettingsView: View {
-    private enum SettingsCategory: String, CaseIterable {
-        case general, asr, oss, storage, logs, email
-    }
-    
     // MARK: - Properties
     
     @ObservedObject var settings: SettingsStore

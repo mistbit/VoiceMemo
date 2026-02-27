@@ -26,7 +26,6 @@ class EmailService {
     }
     
     func sendEmail(subject: String, body: String, attachmentPath: String?) async throws {
-        // 1. Validation
         let gatewayUrlString = settings.fastmailUrl
         let token = settings.getFastmailToken()
         let recipient = settings.recipientEmail
@@ -41,7 +40,6 @@ class EmailService {
             throw EmailError.invalidURL
         }
         
-        // 2. Build Request
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -51,26 +49,22 @@ class EmailService {
         
         var httpBody = Data()
         
-        // Helper to append strings
         func append(_ string: String) {
             if let data = string.data(using: .utf8) {
                 httpBody.append(data)
             }
         }
         
-        // Helper to append fields
         func appendField(name: String, value: String) {
             append("--\(boundary)\r\n")
             append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n")
             append("\(value)\r\n")
         }
         
-        // Add Fields
         appendField(name: "to", value: recipient)
         appendField(name: "subject", value: subject)
         appendField(name: "body", value: body)
         
-        // Add Attachment
         if let attachmentPath = attachmentPath, FileManager.default.fileExists(atPath: attachmentPath) {
             let fileUrl = URL(fileURLWithPath: attachmentPath)
             let filename = fileUrl.lastPathComponent
@@ -88,7 +82,6 @@ class EmailService {
         append("--\(boundary)--\r\n")
         request.httpBody = httpBody
         
-        // 3. Send Request
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
             
