@@ -118,6 +118,8 @@ struct PipelineView: View {
         let duration = isCurrentTask ? playback.duration : 0
         let currentTime = isCurrentTask ? playback.currentTime : 0
         
+        let errorMessage = isCurrentTask ? playback.lastErrorMessage : nil
+        
         VStack(spacing: 12) {
             // Timeline
             HStack(spacing: 8) {
@@ -176,6 +178,13 @@ struct PipelineView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!isCurrentTask)
+            }
+            
+            if let errorMessage, !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding()

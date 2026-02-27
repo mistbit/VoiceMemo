@@ -2,6 +2,7 @@ import Foundation
 
 extension Notification.Name {
     static let meetingTaskDidUpdate = Notification.Name("meetingTaskDidUpdate")
+    static let playbackShouldStop = Notification.Name("playbackShouldStop")
 }
 
 enum MeetingTaskStatus: String, Codable, CaseIterable, Hashable {
