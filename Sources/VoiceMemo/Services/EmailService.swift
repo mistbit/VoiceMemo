@@ -25,14 +25,25 @@ class EmailService {
         self.settings = settings
     }
     
+    // Helper for testing
+    static func parseRecipients(_ raw: String) -> String {
+        return raw.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: ",")
+    }
+
     func sendEmail(subject: String, body: String, attachmentPath: String?) async throws {
         let gatewayUrlString = settings.fastmailUrl
         let token = settings.getFastmailToken()
-        let recipient = settings.recipientEmail
+        let rawRecipients = settings.recipientEmail
+        
+        // Clean up and validate recipients
+        let recipients = Self.parseRecipients(rawRecipients)
         
         guard !gatewayUrlString.isEmpty,
               let token = token, !token.isEmpty,
-              !recipient.isEmpty else {
+              !recipients.isEmpty else {
             throw EmailError.missingConfiguration
         }
         
@@ -61,7 +72,7 @@ class EmailService {
             append("\(value)\r\n")
         }
         
-        appendField(name: "to", value: recipient)
+        appendField(name: "to", value: recipients)
         appendField(name: "subject", value: subject)
         appendField(name: "body", value: body)
         

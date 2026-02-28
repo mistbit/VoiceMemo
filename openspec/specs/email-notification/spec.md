@@ -16,7 +16,7 @@ The system SHALL support configuration for the `fastmail` gateway.
 - **THEN** the user MUST be able to input:
   - `FastMail Gateway URL` (e.g., `http://localhost:8080`)
   - `FastMail Token` (for authentication)
-  - `Recipient Email` (the default "corresponding user" email)
+  - `Recipient Emails` (comma-separated email addresses)
 - **AND** these settings MUST be persisted securely (Token in Keychain).
 
 ### Requirement: Automated Email Sending
@@ -24,13 +24,13 @@ The system SHALL automatically send an email with the meeting summary upon succe
 
 #### Scenario: Pipeline completes successfully
 - **WHEN** the meeting pipeline reaches the `completed` state (after transcription and summarization)
-- **AND** the `FastMail Gateway URL` and `Recipient Email` are configured
+- **AND** the `FastMail Gateway URL` and `Recipient Emails` are configured
 - **THEN** the system MUST generate the Markdown summary of the meeting
 - **AND** the system MUST send a POST request to the configured gateway URL
   - **Endpoint**: `/api/v1/send` (based on `fastmail` API)
   - **Headers**: `Authorization: Bearer <token>`
   - **Body**:
-    - `to`: `<Recipient Email>`
+    - `to`: `<Recipient Emails>` (comma-separated)
     - `subject`: `Meeting Summary: <Meeting Title>`
     - `body`: "Please find the attached meeting summary." (or the summary content itself if preferred)
     - `attachments`: The generated Markdown file
