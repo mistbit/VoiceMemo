@@ -40,7 +40,6 @@ class EmailService {
 
         // Clean up and validate recipients
         let recipients = Self.parseRecipients(rawRecipients)
-
         guard !gatewayUrlString.isEmpty,
               let token = token, !token.isEmpty,
               !recipients.isEmpty else {
