@@ -630,10 +630,59 @@ struct SettingsView: View {
                         }
 
                         FormRow(label: "Recipients") {
-                            TextField("email1@example.com, email2@example.com", text: $settings.recipientEmail)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(maxWidth: .infinity)
-                                .help("Where the meeting summary will be sent. Separate multiple emails with commas.")
+                            VStack(alignment: .leading, spacing: 8) {
+                                TextField("email1@example.com, email2@example.com", text: $settings.recipientEmail)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(maxWidth: .infinity)
+                                
+                                let recipients = EmailService.parseRecipients(settings.recipientEmail)
+                                    .split(separator: ",")
+                                    .map(String.init)
+                                
+                                if !recipients.isEmpty {
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 6) {
+                                            ForEach(recipients, id: \.self) { email in
+                                                HStack(spacing: 4) {
+                                                    Image(systemName: "envelope.fill")
+                                                        .font(.system(size: 10))
+                                                    Text(email)
+                                                        .font(.system(size: 11, weight: .medium))
+                                                }
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(Color.accentColor.opacity(0.1))
+                                                .cornerRadius(6)
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 6)
+                                                        .stroke(Color.accentColor.opacity(0.2), lineWidth: 1)
+                                                )
+                                            }
+                                        }
+                                        .padding(.vertical, 2)
+                                    }
+                                    
+                                    HStack {
+                                        Text("Detected \(recipients.count) recipient(s).")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                        
+                                        Spacer()
+                                        
+                                        Button("Clear All") {
+                                            settings.recipientEmail = ""
+                                        }
+                                        .buttonStyle(.borderless)
+                                        .font(.caption2)
+                                        .foregroundColor(.red)
+                                    }
+                                } else {
+                                    Text("Separate multiple emails with commas.")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .help("Where the meeting summary will be sent. Separate multiple emails with commas.")
                         }
                     }
                 }
@@ -713,13 +762,15 @@ struct SettingsView: View {
     private func testEmail() async {
         emailTestStatus = "Testing..."
         let service = EmailService(settings: settings)
+        let recipients = EmailService.parseRecipients(settings.recipientEmail)
+        
         do {
             try await service.sendEmail(
                 subject: "Test Email from VoiceMemo",
                 body: "This is a test email to verify your configuration.",
-                attachmentPath: nil
+                attachmentPaths: nil
             )
-            emailTestStatus = "Success: Email sent"
+            emailTestStatus = "Success: Email sent to \(recipients)"
         } catch {
             emailTestStatus = "Failed: \(error.localizedDescription)"
         }

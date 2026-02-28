@@ -19,18 +19,17 @@ Users can configure the email gateway in the application settings:
     - The `MeetingPipelineManager` detects that the transcription and summarization tasks are complete.
     - If email notification is enabled, the system proceeds to generate the Markdown file.
 
-2.  **Markdown Generation**:
-    - The system generates a Markdown file containing:
-        - Meeting Metadata (Title, Date, Duration)
-        - Summary
-        - Key Points
-        - Action Items
-        - Full Transcript
+2.  **Attachment Preparation**:
+    - The system prepares attachments based on user settings:
+        - **Summary**: Markdown file with metadata, summary, key points, and action items.
+        - **Audio**: Original audio recording file (local or downloaded).
+        - **Transcript**: Full transcript text file.
+        - **Raw Data**: Raw JSON response from the ASR provider.
 
 3.  **Email Dispatch**:
     - The system constructs a multipart HTTP POST request to the configured Gateway URL.
-    - The request includes the Markdown file as an attachment.
-    - The email is sent to the configured recipient.
+    - The request includes the selected files as attachments.
+    - The email is sent to the configured recipients.
 
 4.  **Status Feedback**:
     - The pipeline status reflects the outcome of the email sending process (Success/Failure).
