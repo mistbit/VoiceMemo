@@ -607,17 +607,17 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: Layout.groupSpacing) {
                     Toggle("Enable Email Notifications", isOn: $settings.enableEmailNotification)
                         .toggleStyle(.switch)
-                    
+
                     if settings.enableEmailNotification {
                         Divider().padding(.vertical, 4)
-                        
+
                         FormRow(label: "Gateway URL") {
                             TextField("https://your-fastmail-gateway.com", text: $settings.fastmailUrl)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(maxWidth: .infinity)
                                 .help("The URL of your FastMail gateway instance")
                         }
-                        
+
                         FormRow(label: "API Token") {
                             SecureField("Enter Gateway Token", text: $fastmailTokenInput)
                                 .textFieldStyle(.roundedBorder)
@@ -628,7 +628,7 @@ struct SettingsView: View {
                                     }
                                 }
                         }
-                        
+
                         FormRow(label: "Recipients") {
                             TextField("email1@example.com, email2@example.com", text: $settings.recipientEmail)
                                 .textFieldStyle(.roundedBorder)
@@ -638,8 +638,52 @@ struct SettingsView: View {
                     }
                 }
             }
-            
+
             if settings.enableEmailNotification {
+                StyledGroupBox("Email Attachments") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Select which content to include in email attachments:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        FormRow(label: "Summary") {
+                            Toggle("", isOn: $settings.emailAttachSummary)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                            Text("Include markdown summary")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        FormRow(label: "Audio") {
+                            Toggle("", isOn: $settings.emailAttachAudio)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                            Text("Include audio recording file")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        FormRow(label: "Transcript") {
+                            Toggle("", isOn: $settings.emailAttachTranscript)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                            Text("Include transcript text file")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        FormRow(label: "Raw Data") {
+                            Toggle("", isOn: $settings.emailAttachRawData)
+                                .toggleStyle(.switch)
+                                .labelsHidden()
+                            Text("Include raw JSON response")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
                 Button(action: {
                     Task {
                         await testEmail()
@@ -653,7 +697,7 @@ struct SettingsView: View {
                     }
                 }
                 .disabled(emailTestStatus == "Testing...")
-                
+
                 if !emailTestStatus.isEmpty {
                     Text(emailTestStatus)
                         .font(.caption)
