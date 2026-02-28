@@ -115,7 +115,7 @@ struct ResultView: View {
                 case .overview:
                     OverviewView(task: task)
                 case .transcript:
-                    TranscriptView(text: derivedTranscript() ?? "No transcript available.")
+                    TranscriptView(text: task.derivedTranscriptText() ?? "No transcript available.")
                 case .raw:
                     RawDataView(text: task.rawData ?? task.rawResponse ?? "No raw response.")
                 case .pipeline:

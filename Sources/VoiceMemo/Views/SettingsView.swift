@@ -602,53 +602,67 @@ struct SettingsView: View {
     }
     
     private var emailForm: some View {
-        VStack(spacing: Layout.standardSpacing) {
-            StyledGroupBox("FastMail Gateway") {
-                FormRow(label: "Enable") {
-                    Toggle("Enable Email Notification", isOn: $settings.enableEmailNotification)
+        VStack(alignment: .leading, spacing: Layout.standardSpacing) {
+            StyledGroupBox("Email Configuration") {
+                VStack(alignment: .leading, spacing: Layout.groupSpacing) {
+                    Toggle("Enable Email Notifications", isOn: $settings.enableEmailNotification)
                         .toggleStyle(.switch)
-                        .labelsHidden()
-                    Spacer()
-                }
-                
-                if settings.enableEmailNotification {
-                    FormRow(label: "Gateway URL") {
-                        TextField("e.g. http://localhost:8080", text: $settings.fastmailUrl)
-                            .textFieldStyle(.roundedBorder)
-                    }
                     
-                    FormRow(label: "Recipient") {
-                        TextField("Email address", text: $settings.recipientEmail)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    
-                    FormRow(label: "Token") {
-                        CredentialRow(
-                            hasValue: settings.hasFastmailToken,
-                            input: $fastmailTokenInput,
-                            placeholder: "Bearer Token",
-                            isSecure: true,
-                            onSave: { settings.saveFastmailToken(fastmailTokenInput) },
-                            onClear: { settings.clearFastmailSecrets() }
-                        )
-                    }
-                    
-                    Divider()
-                    
-                    FormRow(label: "Actions") {
-                        HStack {
-                            Button("Test Email") {
-                                Task { await testEmail() }
-                            }
-                            if !emailTestStatus.isEmpty {
-                                Text(emailTestStatus)
-                                    .font(.caption)
-                                    .foregroundColor(emailTestStatus.contains("Success") ? .green : .red)
-                            }
+                    if settings.enableEmailNotification {
+                        Divider().padding(.vertical, 4)
+                        
+                        FormRow(label: "Gateway URL") {
+                            TextField("https://your-fastmail-gateway.com", text: $settings.fastmailUrl)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: .infinity)
+                                .help("The URL of your FastMail gateway instance")
+                        }
+                        
+                        FormRow(label: "API Token") {
+                            SecureField("Enter Gateway Token", text: $fastmailTokenInput)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: .infinity)
+                                .onChange(of: fastmailTokenInput) { newValue in
+                                    if !newValue.isEmpty {
+                                        settings.saveFastmailToken(newValue)
+                                    }
+                                }
+                        }
+                        
+                        FormRow(label: "Recipient") {
+                            TextField("your-email@example.com", text: $settings.recipientEmail)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: .infinity)
+                                .help("Where the meeting summary will be sent")
                         }
                     }
                 }
             }
+            
+            if settings.enableEmailNotification {
+                Button(action: {
+                    Task {
+                        await testEmail()
+                    }
+                }) {
+                    HStack {
+                        if emailTestStatus == "Testing..." {
+                            ProgressView().controlSize(.small).padding(.trailing, 4)
+                        }
+                        Text("Test Email Notification")
+                    }
+                }
+                .disabled(emailTestStatus == "Testing...")
+                
+                if !emailTestStatus.isEmpty {
+                    Text(emailTestStatus)
+                        .font(.caption)
+                        .foregroundColor(emailTestStatus.contains("Success") ? .green : .red)
+                }
+            }
+        }
+        .onAppear {
+            fastmailTokenInput = ""
         }
     }
     

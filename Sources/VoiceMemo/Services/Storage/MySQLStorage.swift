@@ -60,11 +60,10 @@ final class MySQLStorage: StorageProvider, @unchecked Sendable {
             return
         }
         isShutdown = true
-        if let pool = pool {
-            self.pool = nil
-            pool.shutdown()
-        }
-        try? group.syncShutdownGracefully()
+        let localPool = pool
+        self.pool = nil
+        localPool?.shutdown()
+        group.shutdownGracefully { _ in }
     }
     
     func createTableIfNeeded() async throws {
