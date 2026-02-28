@@ -23,3 +23,4 @@ See [01-architecture-overview.md](01-architecture-overview.md) for detailed arch
 - 06-testing.md
 - 08-import-guide.md
 - 09-security-and-audit.md
+- 10-email-notification.md

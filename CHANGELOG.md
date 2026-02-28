@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Settings UI for configuring Volcengine App ID, Resource ID, and Access Token.
 - **Theme Mode**: Support for System (Auto) / Light / Dark appearance in Settings.
 - **Security and Audit Documentation**: Added comprehensive security and audit notes (doc/09-security-and-audit.md).
+- **Email Notifications**: Added email notification feature to send meeting summaries via configured FastMail gateway. Includes Settings UI for Gateway URL, API Token, and Recipient configuration.
 
 ### Changed
 - **Task Info UI**: Redesigned the Task Info section in Result View with a grid layout, status indicators, and copy functionality for Task Key.

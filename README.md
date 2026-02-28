@@ -18,6 +18,7 @@ Read this in Chinese: [README_CN.md](README_CN.md)
 - **Privacy-First**: Operates locally on your machine with clear permission handling.
 - **Meeting Minutes (Multi-Provider ASR)**: Support for **Alibaba Cloud Tingwu** and **Volcengine** (ByteDance) to transcribe audio and generate structured minutes (summary, key points, action items), with Markdown export.
 - **Storage Backends (SQLite/MySQL)**: Store history locally or in MySQL, with optional local-to-MySQL sync.
+- **Email Notifications**: Send meeting summaries directly to your email via a configured gateway.
 
 ## Changelog
 
@@ -108,7 +109,15 @@ Open Settings in the app and configure:
 - **Alibaba Tingwu**: AppKey
 - **Volcengine**: AppId, AccessToken, ResourceId (supports auto format inference)
 
-### 4. Audio Outputs
+### 4. Configure Email (optional)
+
+In **Settings > Email**, you can enable email notifications to receive meeting summaries:
+
+- **Gateway URL**: The endpoint of your email sending service (e.g., FastMail gateway).
+- **API Token**: The authentication token for the gateway.
+- **Recipient**: The email address to receive the summaries.
+
+### 5. Audio Outputs
 
 Recorded audio files are saved to:
 
@@ -125,13 +134,13 @@ Imported audio files are copied into the app sandbox:
 
 - `~/Library/Application Support/VoiceMemo/recordings/` (filename: `<uuid>.<ext>`)
 
-### 5. Generate minutes
+### 6. Generate minutes
 
 After a recording completes, the latest task appears in the pipeline UI. Trigger the steps manually:
 - Transcode → Upload → Create Task → Refresh Status
 - View Result → Export Markdown
 
-### 6. Import audio (optional)
+### 7. Import audio (optional)
 
 Use the sidebar action **Import Audio** to create a meeting task from an existing audio file, then run the same pipeline steps as above.
 
@@ -161,6 +170,7 @@ Ensure you configure **Signing & Capabilities** with your Development Team to ru
 - [x] Manual pipeline UI (transcode/upload/create/poll)
 - [x] MySQL storage backend with local-to-remote sync
 - [x] Unified error handling for ASR services
+- [x] Email notifications for meeting summaries
 
 ### Planned
 - [ ] Speaker diarization (cloud-based)
