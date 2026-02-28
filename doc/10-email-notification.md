@@ -4,14 +4,14 @@
 This document outlines the integration of automated email notifications using the [FastMail Gateway](https://github.com/mistbit/fastmail).
 
 ## Feature Description
-The system will automatically generate a Markdown summary of the meeting and send it via email to a configured recipient upon successful completion of the processing pipeline.
+The system will automatically generate a Markdown summary of the meeting and send it via email to configured recipients (supports multiple recipients) upon successful completion of the processing pipeline.
 
 ## Configuration
 Users can configure the email gateway in the application settings:
 
 - **Gateway URL**: The endpoint of the deployed FastMail service (e.g., `http://localhost:8080`).
 - **Authentication Token**: The secure token for accessing the gateway.
-- **Recipient Email**: The email address where the summary should be sent.
+- **Recipient Emails**: The email addresses where the summary should be sent. Separate multiple emails with commas.
 
 ## Workflow
 

@@ -4,14 +4,14 @@
 本文档概述了使用 [FastMail Gateway](https://github.com/mistbit/fastmail) 集成自动邮件通知的功能。
 
 ## 功能描述
-当处理流水线成功完成后，系统将自动生成会议的 Markdown 摘要，并通过邮件发送给配置的收件人。
+当处理流水线成功完成后，系统将自动生成会议的 Markdown 摘要，并通过邮件发送给配置的收件人（支持多个收件人）。
 
 ## 配置
 用户可以在应用设置中配置邮件网关：
 
 - **网关 URL (Gateway URL)**：部署的 FastMail 服务端点（例如 `http://localhost:8080`）。
 - **认证令牌 (Authentication Token)**：用于访问网关的安全令牌。
-- **收件人邮箱 (Recipient Email)**：接收摘要的邮箱地址。
+- **收件人邮箱 (Recipient Emails)**：接收摘要的邮箱地址。支持多个邮箱，使用逗号分隔。
 
 ## 工作流程
 
