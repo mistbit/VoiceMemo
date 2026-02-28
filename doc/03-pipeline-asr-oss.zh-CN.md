@@ -88,9 +88,9 @@
 `UploadNode` → `OSSService.uploadFile()`：
 
 - ObjectKey 规则：
-  - `"<ossPrefix><yyyy/MM/dd>/<recordingId>/mixed.m4a"`
+  - `"<ossPrefix><yyyy/MM/dd>/<recordingId>/<transcoded_filename>.m4a"`
 - 说明：
-  - 本地转码文件名使用 `mixed_48k.m4a`，但 OSS objectKey 仍保持 `mixed.m4a`。
+  - OSS objectKey 将直接使用本地转码后的文件名（例如 `recording-...-mixed_48k.m4a`），确保唯一性和可追溯性。
 - 返回：
   - `publicUrl = https://<bucket>.<endpointHost>/<objectKey>`
 - 更新：

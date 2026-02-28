@@ -309,14 +309,29 @@ class MeetingPipelineManager: ObservableObject {
                 let url = URL(fileURLWithPath: path)
                 let inputFilename = url.deletingPathExtension().lastPathComponent
                 
-                // Try new naming convention first (e.g. recording-timestamp-mixed_48k.m4a)
+                // 1. Try timestamped naming convention (recording-uuid-timestamp_48k.m4a)
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyyMMdd-HHmmss"
+                let timestamp = formatter.string(from: task.createdAt)
+                
+                let timestampedFilename: String
+                if inputFilename.contains(timestamp) {
+                    timestampedFilename = "\(inputFilename)_48k.m4a"
+                } else {
+                    timestampedFilename = "\(inputFilename)-\(timestamp)_48k.m4a"
+                }
+                let timestampedUrl = url.deletingLastPathComponent().appendingPathComponent(timestampedFilename)
+                
+                // 2. Try input-based naming convention (recording-uuid_48k.m4a)
                 let newProcessedFilename = "\(inputFilename)_48k.m4a"
                 let newProcessedUrl = url.deletingLastPathComponent().appendingPathComponent(newProcessedFilename)
                 
-                if FileManager.default.fileExists(atPath: newProcessedUrl.path) {
+                if FileManager.default.fileExists(atPath: timestampedUrl.path) {
+                    mixed.processedAudioPath = timestampedUrl.path
+                } else if FileManager.default.fileExists(atPath: newProcessedUrl.path) {
                     mixed.processedAudioPath = newProcessedUrl.path
                 } else {
-                    // Fallback to legacy naming convention
+                    // 3. Fallback to legacy naming convention
                     let legacyProcessedFilename = "mixed_48k.m4a"
                     let legacyProcessedUrl = url.deletingLastPathComponent().appendingPathComponent(legacyProcessedFilename)
                     if FileManager.default.fileExists(atPath: legacyProcessedUrl.path) {
