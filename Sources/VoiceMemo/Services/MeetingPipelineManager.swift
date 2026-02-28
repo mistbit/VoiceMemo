@@ -195,18 +195,68 @@ class MeetingPipelineManager: ObservableObject {
     private func sendEmailNotification() async {
         await MainActor.run { self.isProcessing = true }
         
-        let mdContent = task.markdownSummary()
-        let filename = task.safeFilename().appending(".md")
-        let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        var attachmentPaths: [String] = []
+        var tempFiles: [URL] = []
+        let baseFilename = task.safeFilename()
+        
+        // Prepare summary attachment
+        if settings.emailAttachSummary {
+            let mdContent = task.markdownSummary()
+            let mdFilename = baseFilename.appending(".md")
+            let mdUrl = FileManager.default.temporaryDirectory.appendingPathComponent(mdFilename)
+            if let mdData = mdContent.data(using: .utf8) {
+                try? mdData.write(to: mdUrl)
+                tempFiles.append(mdUrl)
+                attachmentPaths.append(mdUrl.path)
+            }
+        }
+        
+        // Prepare audio attachment
+        if settings.emailAttachAudio {
+            if FileManager.default.fileExists(atPath: task.localFilePath) {
+                attachmentPaths.append(task.localFilePath)
+            } else if let mp3UrlString = task.outputMp3Path, let mp3Url = URL(string: mp3UrlString) {
+                // Try to download from URL
+                if let (tempUrl, _) = try? await URLSession.shared.download(from: mp3Url) {
+                    let destination = FileManager.default.temporaryDirectory.appendingPathComponent(mp3Url.lastPathComponent)
+                    try? FileManager.default.moveItem(at: tempUrl, to: destination)
+                    tempFiles.append(destination)
+                    attachmentPaths.append(destination.path)
+                }
+            }
+        }
+        
+        // Prepare transcript attachment
+        if settings.emailAttachTranscript, let transcriptText = task.derivedTranscriptText() {
+            let transcriptFilename = baseFilename.appending("-transcript.txt")
+            let transcriptUrl = FileManager.default.temporaryDirectory.appendingPathComponent(transcriptFilename)
+            if let transcriptData = transcriptText.data(using: .utf8) {
+                try? transcriptData.write(to: transcriptUrl)
+                tempFiles.append(transcriptUrl)
+                attachmentPaths.append(transcriptUrl.path)
+            }
+        }
+        
+        // Prepare raw data attachment
+        if settings.emailAttachRawData {
+            if let rawDataStr = task.rawData ?? task.rawResponse {
+                let rawFilename = baseFilename.appending("-raw.json")
+                let rawUrl = FileManager.default.temporaryDirectory.appendingPathComponent(rawFilename)
+                if let rawData = rawDataStr.data(using: .utf8) {
+                    try? rawData.write(to: rawUrl)
+                    tempFiles.append(rawUrl)
+                    attachmentPaths.append(rawUrl.path)
+                }
+            }
+        }
         
         do {
-            try mdContent.write(to: tempUrl, atomically: true, encoding: .utf8)
-            
             let emailService = EmailService(settings: settings)
+            let paths = attachmentPaths.isEmpty ? nil : attachmentPaths
             try await emailService.sendEmail(
                 subject: "Meeting Summary: \(task.title)",
-                body: "Please find the attached meeting summary.",
-                attachmentPath: tempUrl.path
+                body: "Please find the attached meeting content.",
+                attachmentPaths: paths
             )
             settings.log("Email sent successfully to \(settings.recipientEmail)")
         } catch {
@@ -216,7 +266,10 @@ class MeetingPipelineManager: ObservableObject {
             }
         }
         
-        try? FileManager.default.removeItem(at: tempUrl)
+        // Clean up temporary files
+        for tempFile in tempFiles {
+            try? FileManager.default.removeItem(at: tempFile)
+        }
         
         await MainActor.run { self.isProcessing = false }
     }

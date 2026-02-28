@@ -123,6 +123,20 @@ class SettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(enableEmailNotification, forKey: "enableEmailNotification") }
     }
     @Published var hasFastmailToken: Bool = false
+
+    // Email Attachment Options
+    @Published var emailAttachSummary: Bool {
+        didSet { UserDefaults.standard.set(emailAttachSummary, forKey: "emailAttachSummary") }
+    }
+    @Published var emailAttachAudio: Bool {
+        didSet { UserDefaults.standard.set(emailAttachAudio, forKey: "emailAttachAudio") }
+    }
+    @Published var emailAttachTranscript: Bool {
+        didSet { UserDefaults.standard.set(emailAttachTranscript, forKey: "emailAttachTranscript") }
+    }
+    @Published var emailAttachRawData: Bool {
+        didSet { UserDefaults.standard.set(emailAttachRawData, forKey: "emailAttachRawData") }
+    }
     
     // Audio Recording Config
     @Published var savePathBookmark: Data? {
@@ -184,6 +198,12 @@ class SettingsStore: ObservableObject {
         self.fastmailUrl = UserDefaults.standard.string(forKey: "fastmailUrl") ?? ""
         self.recipientEmail = UserDefaults.standard.string(forKey: "recipientEmail") ?? ""
         self.enableEmailNotification = UserDefaults.standard.object(forKey: "enableEmailNotification") as? Bool ?? false
+
+        // Email Attachment Options
+        self.emailAttachSummary = UserDefaults.standard.object(forKey: "emailAttachSummary") as? Bool ?? true
+        self.emailAttachAudio = UserDefaults.standard.object(forKey: "emailAttachAudio") as? Bool ?? false
+        self.emailAttachTranscript = UserDefaults.standard.object(forKey: "emailAttachTranscript") as? Bool ?? false
+        self.emailAttachRawData = UserDefaults.standard.object(forKey: "emailAttachRawData") as? Bool ?? false
         
         migrateLegacySecrets()
         checkSecrets()
