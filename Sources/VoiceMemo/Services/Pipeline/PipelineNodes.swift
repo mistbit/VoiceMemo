@@ -76,7 +76,9 @@ class TranscodeNode: PipelineNode {
         
         // 2. Prepare Output Path
         let inputURL = URL(fileURLWithPath: inputPath)
-        let outputFilename = channelId == 0 ? "mixed_48k.m4a" : "speaker\(channelId)_48k.m4a"
+        // Fix: Use input filename as base to ensure uniqueness (e.g. recording-timestamp-mixed_48k.m4a)
+        let inputFilename = inputURL.deletingPathExtension().lastPathComponent
+        let outputFilename = "\(inputFilename)_48k.m4a"
         let outputURL = inputURL.deletingLastPathComponent().appendingPathComponent(outputFilename)
         
         // 3. Idempotency Check

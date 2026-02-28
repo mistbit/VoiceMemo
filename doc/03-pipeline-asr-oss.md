@@ -77,7 +77,7 @@ Provider selection is controlled by `SettingsStore.asrProvider` and wired in `Me
 `MeetingPipelineManager.transcode()` triggers the full pipeline start. The actual work is performed by `TranscodeNode`.
 
 - Input: `task.localFilePath` (typically `...mixed.m4a`)
-- Output: `mixed_48k.m4a` in the same folder
+- Output: `mixed_48k.m4a` (or `recording-...-mixed_48k.m4a`) in the same folder
 - Uses `AVAssetExportSession` with preset `AVAssetExportPresetAppleM4A`
 - Updates:
   - `task.localFilePath` to the transcoded file

@@ -77,7 +77,7 @@
 `MeetingPipelineManager.transcode()` 用于触发流水线开始，实际转码由 `TranscodeNode` 执行：
 
 - 输入：`task.localFilePath`（通常是 `...mixed.m4a`）
-- 输出：同目录下的 `mixed_48k.m4a`
+- 输出：同目录下的 `mixed_48k.m4a`（或 `recording-...-mixed_48k.m4a`）
 - 使用 `AVAssetExportSession` + `AVAssetExportPresetAppleM4A`
 - 更新：
   - `task.localFilePath` 指向转码后的文件

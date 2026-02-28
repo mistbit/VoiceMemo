@@ -307,10 +307,21 @@ class MeetingPipelineManager: ObservableObject {
                 mixed.rawAudioPath = path
                 // Check for existing processed file
                 let url = URL(fileURLWithPath: path)
-                let processedFilename = "mixed_48k.m4a"
-                let processedUrl = url.deletingLastPathComponent().appendingPathComponent(processedFilename)
-                if FileManager.default.fileExists(atPath: processedUrl.path) {
-                    mixed.processedAudioPath = processedUrl.path
+                let inputFilename = url.deletingPathExtension().lastPathComponent
+                
+                // Try new naming convention first (e.g. recording-timestamp-mixed_48k.m4a)
+                let newProcessedFilename = "\(inputFilename)_48k.m4a"
+                let newProcessedUrl = url.deletingLastPathComponent().appendingPathComponent(newProcessedFilename)
+                
+                if FileManager.default.fileExists(atPath: newProcessedUrl.path) {
+                    mixed.processedAudioPath = newProcessedUrl.path
+                } else {
+                    // Fallback to legacy naming convention
+                    let legacyProcessedFilename = "mixed_48k.m4a"
+                    let legacyProcessedUrl = url.deletingLastPathComponent().appendingPathComponent(legacyProcessedFilename)
+                    if FileManager.default.fileExists(atPath: legacyProcessedUrl.path) {
+                        mixed.processedAudioPath = legacyProcessedUrl.path
+                    }
                 }
             }
         }
