@@ -46,7 +46,8 @@ struct ResultView: View {
                     
                     Spacer()
                     
-                    if settings.enableEmailNotification && task.status == .completed {
+                    if settings.enableEmailNotification {
+                        let isCompleted = task.status == .completed
                         Button(action: {
                             Task { await sendEmail() }
                         }) {
@@ -59,8 +60,8 @@ struct ResultView: View {
                                 Text(emailStatus ?? "Email")
                             }
                         }
-                        .disabled(isSendingEmail)
-                        .help("Send meeting summary via email")
+                        .disabled(isSendingEmail || !isCompleted)
+                        .help(isCompleted ? "Send meeting summary via email" : "Please wait for the pipeline to complete")
                     }
                     
                     Button(action: exportMarkdown) {
