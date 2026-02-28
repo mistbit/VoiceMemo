@@ -629,11 +629,11 @@ struct SettingsView: View {
                                 }
                         }
                         
-                        FormRow(label: "Recipient") {
-                            TextField("your-email@example.com", text: $settings.recipientEmail)
+                        FormRow(label: "Recipients") {
+                            TextField("email1@example.com, email2@example.com", text: $settings.recipientEmail)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(maxWidth: .infinity)
-                                .help("Where the meeting summary will be sent")
+                                .help("Where the meeting summary will be sent. Separate multiple emails with commas.")
                         }
                     }
                 }
