@@ -61,7 +61,15 @@ struct ResultView: View {
                             }
                         }
                         .disabled(isSendingEmail || !isCompleted)
-                        .help(isCompleted ? "Send meeting summary via email" : "Please wait for the pipeline to complete")
+                        .help({
+                            if isCompleted {
+                                return "Send meeting summary via email"
+                            }
+                            if task.status == .failed {
+                                return "Pipeline failed — email can only be sent after completion"
+                            }
+                            return "Please wait for the pipeline to complete"
+                        }())
                     }
                     
                     Button(action: exportMarkdown) {
