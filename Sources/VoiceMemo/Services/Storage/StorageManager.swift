@@ -29,17 +29,21 @@ class StorageManager: ObservableObject {
             }
             .store(in: &cancellables)
             
-        // Listen to MySQL config changes to update the provider
-        settings.objectWillChange
-            .sink { [weak self] _ in
-                // Debounce or just check if relevant fields changed?
-                // For simplicity, we can update on next access or lazily.
-                // But if we are currently using MySQL, we might need to reconnect.
-                if self?.settingsStore?.storageType == .mysql {
-                    self?.updateMySQLProvider()
-                }
+        Publishers.CombineLatest4(
+            settings.$mysqlHost,
+            settings.$mysqlPort,
+            settings.$mysqlUser,
+            settings.$mysqlDatabase
+        )
+        .combineLatest(settings.$hasMySQLPassword)
+        .dropFirst()
+        .debounce(for: .seconds(1.0), scheduler: DispatchQueue.main)
+        .sink { [weak self] _ in
+            if self?.settingsStore?.storageType == .mysql {
+                self?.updateMySQLProvider()
             }
-            .store(in: &cancellables)
+        }
+        .store(in: &cancellables)
             
         // Initial setup
         switchProvider(to: settings.storageType)

@@ -161,3 +161,65 @@ extension MeetingTask {
         }
     }
 }
+
+extension MeetingTask {
+    func markdownSummary() -> String {
+        var md = "# \(title)\n\n"
+        md += "Date: \(createdAt)\n\n"
+        
+        md += "## Task Info\n"
+        if let key = taskKey { md += "- Task Key: \(key)\n" }
+        if let status = apiStatus { md += "- Status: \(status)\n" }
+        if let error = statusText, !error.isEmpty { md += "- Message: \(error)\n" }
+        if let duration = bizDuration { md += "- Duration: \(duration / 1000)s\n" }
+        if let mp3 = outputMp3Path { md += "- Audio: [Download](\(mp3))\n" }
+        md += "\n"
+        
+        if let summary = summary {
+            md += "## Summary\n\(summary)\n\n"
+        }
+        
+        if let keyPoints = keyPoints {
+            md += "## Key Points\n\(keyPoints)\n\n"
+        }
+        
+        if let actionItems = actionItems {
+            md += "## Action Items\n\(actionItems)\n\n"
+        }
+        
+        if let transcript = derivedTranscriptText() {
+            md += "## Transcript\n\(transcript)\n"
+        }
+        
+        return md
+    }
+    
+    func derivedTranscriptText() -> String? {
+        if let transcript = transcript, !transcript.isEmpty {
+            return transcript
+        }
+        
+        if let dataStr = transcriptData,
+           let data = dataStr.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let text = TranscriptParser.buildTranscriptText(from: json) {
+                return text
+            }
+        }
+        
+        guard let raw = rawResponse,
+              let data = raw.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        
+        return TranscriptParser.buildTranscriptText(from: json)
+    }
+    
+    func safeFilename() -> String {
+        let invalid = CharacterSet(charactersIn: "/:\\")
+        let parts = title.components(separatedBy: invalid)
+        let name = parts.joined(separator: "_").trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "meeting-summary" : name
+    }
+}

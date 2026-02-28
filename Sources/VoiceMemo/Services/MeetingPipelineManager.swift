@@ -116,15 +116,15 @@ class MeetingPipelineManager: ObservableObject {
     // MARK: - Board & Execution Logic
     
     private func executeChain(nodes: [PipelineNode]) async {
-        // 1. Hydrate Board from Task
         let taskSnapshot = await MainActor.run { self.task }
         var board = createBoard(from: taskSnapshot)
         let services = ServiceProvider(ossService: ossService, transcriptionService: transcriptionService)
         
         await MainActor.run { self.isProcessing = true }
         
+        var isChainCompleted = true
+        
         for node in nodes {
-            // Update UI status to "Running"
             await updateStatus(node.step, isFailed: false)
             
             var success = false
@@ -132,69 +132,96 @@ class MeetingPipelineManager: ObservableObject {
             
             while !success {
                 do {
-                    // 2. Run Node (Pure execution on Board)
                     try await node.run(board: &board, services: services)
                     
-                    // 3. Persist State (Sync Board back to Task)
                     await persistState(from: board, channelId: 0, completedStep: node.step)
                     success = true
                     
                 } catch {
-                    // Handle PipelineError with type safety
                     if let pipelineError = error as? PipelineError {
                         switch pipelineError {
                         case .taskRunning:
                             retryCount += 1
                             if retryCount > PipelineConstants.maxPollingRetries {
                                 await updateStatus(.failed, step: node.step, error: "Polling timeout", isFailed: true)
+                                isChainCompleted = false
                                 return
                             }
                             try? await Task.sleep(nanoseconds: PipelineConstants.pollingInterval)
                             continue
                         case .channelNotFound(let id):
                             await updateStatus(.failed, step: node.step, error: "Channel \(id) not found", isFailed: true)
+                            isChainCompleted = false
                             return
                         case .inputMissing(let msg):
                             await updateStatus(.failed, step: node.step, error: "Input missing: \(msg)", isFailed: true)
+                            isChainCompleted = false
                             return
                         case .transcodeFailed:
                             await updateStatus(.failed, step: node.step, error: "Transcoding failed", isFailed: true)
+                            isChainCompleted = false
                             return
                         case .cloudError(let msg):
                             await updateStatus(.failed, step: node.step, error: "Cloud service error: \(msg)", isFailed: true)
+                            isChainCompleted = false
                             return
                         case .taskFailed(let msg):
                             await updateStatus(.failed, step: node.step, error: "Task failed: \(msg)", isFailed: true)
+                            isChainCompleted = false
                             return
                         }
                     }
                     
                     if let transcriptionError = error as? TranscriptionError {
-                        await updateStatus(.failed, step: node.step, error: formatTranscriptionError(transcriptionError), isFailed: true)
+                        await updateStatus(.failed, step: node.step, error: "Transcription Error: \(transcriptionError.localizedDescription)", isFailed: true)
+                        isChainCompleted = false
                         return
                     }
                     
-                    // Backward compatibility: handle non-PipelineError NSError
-                    let nsError = error as NSError
-                    if nsError.code == 202 {
-                        retryCount += 1
-                        if retryCount > PipelineConstants.maxPollingRetries {
-                            await updateStatus(.failed, step: node.step, error: "Polling timeout", isFailed: true)
-                            return
-                        }
-                        try? await Task.sleep(nanoseconds: PipelineConstants.pollingInterval)
-                        continue
-                    }
-                    
-                    // Unknown error
                     await updateStatus(.failed, step: node.step, error: error.localizedDescription, isFailed: true)
+                    isChainCompleted = false
                     return
                 }
             }
         }
         
         await MainActor.run { self.isProcessing = false }
+        
+        if isChainCompleted && settings.enableEmailNotification && task.status == .completed {
+            await sendEmailNotification()
+        }
     }
+    
+    private func sendEmailNotification() async {
+        await MainActor.run { self.isProcessing = true }
+        
+        let mdContent = task.markdownSummary()
+        let filename = task.safeFilename().appending(".md")
+        let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        
+        do {
+            try mdContent.write(to: tempUrl, atomically: true, encoding: .utf8)
+            
+            let emailService = EmailService(settings: settings)
+            try await emailService.sendEmail(
+                subject: "Meeting Summary: \(task.title)",
+                body: "Please find the attached meeting summary.",
+                attachmentPath: tempUrl.path
+            )
+            settings.log("Email sent successfully to \(settings.recipientEmail)")
+        } catch {
+            settings.log("Failed to send email: \(error.localizedDescription)")
+            await MainActor.run {
+                self.errorMessage = "Email failed: \(error.localizedDescription)"
+            }
+        }
+        
+        try? FileManager.default.removeItem(at: tempUrl)
+        
+        await MainActor.run { self.isProcessing = false }
+    }
+    
+    
     
     // MARK: - Hydration & Persistence
     

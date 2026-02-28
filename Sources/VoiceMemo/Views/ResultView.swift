@@ -6,6 +6,8 @@ struct ResultView: View {
     let settings: SettingsStore
     @ObservedObject var playback: AudioPlaybackController
     @State private var selectedTab: ResultTab = .overview
+    @State private var isSendingEmail = false
+    @State private var emailStatus: String?
     @Namespace private var animationNamespace
     
     enum ResultTab: String, CaseIterable, Identifiable {
@@ -43,6 +45,23 @@ struct ResultView: View {
                     }
                     
                     Spacer()
+                    
+                    if settings.enableEmailNotification && task.status == .completed {
+                        Button(action: {
+                            Task { await sendEmail() }
+                        }) {
+                            HStack(spacing: 4) {
+                                if isSendingEmail {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: "envelope")
+                                }
+                                Text(emailStatus ?? "Email")
+                            }
+                        }
+                        .disabled(isSendingEmail)
+                        .help("Send meeting summary via email")
+                    }
                     
                     Button(action: exportMarkdown) {
                         Label("Export", systemImage: "square.and.arrow.up")
@@ -96,7 +115,7 @@ struct ResultView: View {
                 case .overview:
                     OverviewView(task: task)
                 case .transcript:
-                    TranscriptView(text: derivedTranscript() ?? "No transcript available.")
+                    TranscriptView(text: task.derivedTranscriptText() ?? "No transcript available.")
                 case .raw:
                     RawDataView(text: task.rawData ?? task.rawResponse ?? "No raw response.")
                 case .pipeline:
@@ -112,78 +131,49 @@ struct ResultView: View {
         }
     }
     
+    private func sendEmail() async {
+        isSendingEmail = true
+        emailStatus = "Sending..."
+        
+        let mdContent = task.markdownSummary()
+        let filename = task.safeFilename().appending(".md")
+        let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        
+        do {
+            try mdContent.write(to: tempUrl, atomically: true, encoding: .utf8)
+            
+            let emailService = EmailService(settings: settings)
+            try await emailService.sendEmail(
+                subject: "Meeting Summary: \(task.title)",
+                body: "Please find the attached meeting summary.",
+                attachmentPath: tempUrl.path
+            )
+            emailStatus = "Sent"
+        } catch {
+            emailStatus = "Failed"
+            settings.log("Email failed: \(error.localizedDescription)")
+        }
+        
+        try? FileManager.default.removeItem(at: tempUrl)
+        
+        isSendingEmail = false
+        
+        try? await Task.sleep(nanoseconds: 3 * 1_000_000_000)
+        emailStatus = nil
+    }
+    
     private func exportMarkdown() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
-        panel.nameFieldStringValue = "\(task.title).md"
+        panel.nameFieldStringValue = "\(task.safeFilename()).md"
         
         panel.begin { response in
             if response == .OK, let url = panel.url {
-                let content = generateMarkdown()
+                let content = task.markdownSummary()
                 try? content.write(to: url, atomically: true, encoding: .utf8)
             }
         }
     }
-    
-    private func generateMarkdown() -> String {
-        var md = "# \(task.title)\n\n"
-        md += "Date: \(task.createdAt)\n\n"
-        
-        // Metadata
-        md += "## Task Info\n"
-        if let key = task.taskKey { md += "- Task Key: \(key)\n" }
-        if let status = task.apiStatus { md += "- Status: \(status)\n" }
-        if let error = task.statusText, !error.isEmpty { md += "- Message: \(error)\n" }
-        if let duration = task.bizDuration { md += "- Duration: \(duration / 1000)s\n" }
-        if let mp3 = task.outputMp3Path { md += "- Audio: [Download](\(mp3))\n" }
-        md += "\n"
-        
-        if let summary = task.summary {
-            md += "## Summary\n\(summary)\n\n"
-        }
-        
-        if let keyPoints = task.keyPoints {
-            md += "## Key Points\n\(keyPoints)\n\n"
-        }
-        
-        if let actionItems = task.actionItems {
-            md += "## Action Items\n\(actionItems)\n\n"
-        }
-        
-        if let transcript = derivedTranscript() {
-            md += "## Transcript\n\(transcript)\n"
-        }
-        
-        return md
-    }
-    
-    private func derivedTranscript() -> String? {
-        if let transcript = task.transcript, !transcript.isEmpty {
-            return transcript
-        }
-        
-        // Try to parse from transcriptData (full JSON from DB)
-        if let dataStr = task.transcriptData,
-           let data = dataStr.data(using: .utf8),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let text = TranscriptParser.buildTranscriptText(from: json) {
-                return text
-            }
-        }
-        
-        // Fallback to parsing rawResponse using TranscriptParser
-        guard let raw = task.rawResponse,
-              let data = raw.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-        
-        return TranscriptParser.buildTranscriptText(from: json)
-    }
-    
-    // extractTranscript, extractText, extractSpeaker and stringify helper methods are no longer needed
-    // as all parsing logic is now centralized in TranscriptParser
-    // and derivedTranscript() delegates entirely to TranscriptParser.
 
 }
 

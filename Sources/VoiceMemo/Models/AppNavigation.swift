@@ -88,6 +88,7 @@ enum SettingsCategory: String, Hashable, CaseIterable, Identifiable {
     case asr
     case oss
     case storage
+    case email
     case logs
     
     var id: String { rawValue }
@@ -98,6 +99,7 @@ enum SettingsCategory: String, Hashable, CaseIterable, Identifiable {
         case .asr: return "ASR Service"
         case .oss: return "Object Storage"
         case .storage: return "Storage"
+        case .email: return "Email"
         case .logs: return "Logs"
         }
     }
@@ -108,6 +110,7 @@ enum SettingsCategory: String, Hashable, CaseIterable, Identifiable {
         case .asr: return "Configure Speech-to-Text providers and parameters."
         case .oss: return "Configure Object Storage Service (OSS) settings."
         case .storage: return "Manage data persistence and database connections."
+        case .email: return "Configure FastMail gateway and recipients."
         case .logs: return "View and manage application logs."
         }
     }
@@ -118,6 +121,7 @@ enum SettingsCategory: String, Hashable, CaseIterable, Identifiable {
         case .asr: return "waveform"
         case .oss: return "server.rack"
         case .storage: return "externaldrive"
+        case .email: return "envelope"
         case .logs: return "doc.text"
         }
     }

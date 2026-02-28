@@ -2,6 +2,8 @@ import SwiftUI
 import AppKit
 
 struct SettingsView: View {
+    // MARK: - Properties
+    
     @ObservedObject var settings: SettingsStore
     @ObservedObject var storageManager = StorageManager.shared
     var category: SettingsCategory?
@@ -14,6 +16,8 @@ struct SettingsView: View {
     @State private var mysqlPasswordInput: String = ""
     @State private var testStatus: String = ""
     @State private var mysqlTestStatus: String = ""
+    @State private var fastmailTokenInput: String = ""
+    @State private var emailTestStatus: String = ""
     @State private var showingLog = false
     
     init(settings: SettingsStore, category: SettingsCategory? = nil) {
@@ -34,6 +38,8 @@ struct SettingsView: View {
                         ossForm
                     case .storage:
                         storageForm
+                    case .email:
+                        emailForm
                     case .logs:
                         logsForm
                     }
@@ -43,6 +49,7 @@ struct SettingsView: View {
                         asrForm.tabItem { Text("ASR") }
                         ossForm.tabItem { Text("OSS") }
                         storageForm.tabItem { Text("Storage") }
+                        emailForm.tabItem { Text("Email") }
                         logsForm.tabItem { Text("Logs") }
                     }
                 }
@@ -591,6 +598,86 @@ struct SettingsView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+        }
+    }
+    
+    private var emailForm: some View {
+        VStack(alignment: .leading, spacing: Layout.standardSpacing) {
+            StyledGroupBox("Email Configuration") {
+                VStack(alignment: .leading, spacing: Layout.groupSpacing) {
+                    Toggle("Enable Email Notifications", isOn: $settings.enableEmailNotification)
+                        .toggleStyle(.switch)
+                    
+                    if settings.enableEmailNotification {
+                        Divider().padding(.vertical, 4)
+                        
+                        FormRow(label: "Gateway URL") {
+                            TextField("https://your-fastmail-gateway.com", text: $settings.fastmailUrl)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: .infinity)
+                                .help("The URL of your FastMail gateway instance")
+                        }
+                        
+                        FormRow(label: "API Token") {
+                            SecureField("Enter Gateway Token", text: $fastmailTokenInput)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: .infinity)
+                                .onChange(of: fastmailTokenInput) { newValue in
+                                    if !newValue.isEmpty {
+                                        settings.saveFastmailToken(newValue)
+                                    }
+                                }
+                        }
+                        
+                        FormRow(label: "Recipient") {
+                            TextField("your-email@example.com", text: $settings.recipientEmail)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: .infinity)
+                                .help("Where the meeting summary will be sent")
+                        }
+                    }
+                }
+            }
+            
+            if settings.enableEmailNotification {
+                Button(action: {
+                    Task {
+                        await testEmail()
+                    }
+                }) {
+                    HStack {
+                        if emailTestStatus == "Testing..." {
+                            ProgressView().controlSize(.small).padding(.trailing, 4)
+                        }
+                        Text("Test Email Notification")
+                    }
+                }
+                .disabled(emailTestStatus == "Testing...")
+                
+                if !emailTestStatus.isEmpty {
+                    Text(emailTestStatus)
+                        .font(.caption)
+                        .foregroundColor(emailTestStatus.contains("Success") ? .green : .red)
+                }
+            }
+        }
+        .onAppear {
+            fastmailTokenInput = ""
+        }
+    }
+    
+    private func testEmail() async {
+        emailTestStatus = "Testing..."
+        let service = EmailService(settings: settings)
+        do {
+            try await service.sendEmail(
+                subject: "Test Email from VoiceMemo",
+                body: "This is a test email to verify your configuration.",
+                attachmentPath: nil
+            )
+            emailTestStatus = "Success: Email sent"
+        } catch {
+            emailTestStatus = "Failed: \(error.localizedDescription)"
         }
     }
     

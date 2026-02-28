@@ -112,6 +112,18 @@ class SettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(recordingMode.rawValue, forKey: "recordingMode") }
     }
     
+    // FastMail Config
+    @Published var fastmailUrl: String {
+        didSet { UserDefaults.standard.set(fastmailUrl, forKey: "fastmailUrl") }
+    }
+    @Published var recipientEmail: String {
+        didSet { UserDefaults.standard.set(recipientEmail, forKey: "recipientEmail") }
+    }
+    @Published var enableEmailNotification: Bool {
+        didSet { UserDefaults.standard.set(enableEmailNotification, forKey: "enableEmailNotification") }
+    }
+    @Published var hasFastmailToken: Bool = false
+    
     // Audio Recording Config
     @Published var savePathBookmark: Data? {
         didSet { UserDefaults.standard.set(savePathBookmark, forKey: "savePathBookmark") }
@@ -167,6 +179,11 @@ class SettingsStore: ObservableObject {
         self.recordingMode = RecordingMode(rawValue: UserDefaults.standard.string(forKey: "recordingMode") ?? "mixed") ?? .mixed
         self.savePathBookmark = UserDefaults.standard.data(forKey: "savePathBookmark")
         self.useKeychain = UserDefaults.standard.object(forKey: "useKeychain") as? Bool ?? true
+        
+        // FastMail
+        self.fastmailUrl = UserDefaults.standard.string(forKey: "fastmailUrl") ?? ""
+        self.recipientEmail = UserDefaults.standard.string(forKey: "recipientEmail") ?? ""
+        self.enableEmailNotification = UserDefaults.standard.object(forKey: "enableEmailNotification") as? Bool ?? false
         
         migrateLegacySecrets()
         checkSecrets()
@@ -229,6 +246,7 @@ class SettingsStore: ObservableObject {
         
         hasMySQLPassword = getSecret(key: "mysql_password") != nil
         hasVolcAccessToken = getSecret(key: "volc_access_token") != nil
+        hasFastmailToken = getSecret(key: "fastmail_token") != nil
     }
     
     func saveMySQLPassword(_ value: String) {
@@ -302,10 +320,25 @@ class SettingsStore: ObservableObject {
         checkSecrets()
     }
     
+    func saveFastmailToken(_ value: String) {
+        saveSecret(value, key: "fastmail_token")
+        checkSecrets()
+    }
+    
+    func getFastmailToken() -> String? {
+        return getSecret(key: "fastmail_token")
+    }
+    
+    func clearFastmailSecrets() {
+        deleteSecret(key: "fastmail_token")
+        checkSecrets()
+    }
+    
     func clearSecrets() {
         clearTingwuSecrets()
         clearOSSSecrets()
         clearVolcSecrets()
+        clearFastmailSecrets()
         checkSecrets()
     }
     
