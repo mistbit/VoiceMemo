@@ -77,7 +77,7 @@
 `MeetingPipelineManager.transcode()` 用于触发流水线开始，实际转码由 `TranscodeNode` 执行：
 
 - 输入：`task.localFilePath`（通常是 `...mixed.m4a`）
-- 输出：同目录下的 `mixed_48k.m4a`
+- 输出：同目录下的 `mixed_48k.m4a`（或 `recording-...-mixed_48k.m4a`）
 - 使用 `AVAssetExportSession` + `AVAssetExportPresetAppleM4A`
 - 更新：
   - `task.localFilePath` 指向转码后的文件
@@ -88,9 +88,9 @@
 `UploadNode` → `OSSService.uploadFile()`：
 
 - ObjectKey 规则：
-  - `"<ossPrefix><yyyy/MM/dd>/<recordingId>/mixed.m4a"`
+  - `"<ossPrefix><yyyy/MM/dd>/<recordingId>/<transcoded_filename>.m4a"`
 - 说明：
-  - 本地转码文件名使用 `mixed_48k.m4a`，但 OSS objectKey 仍保持 `mixed.m4a`。
+  - OSS objectKey 将直接使用本地转码后的文件名（例如 `recording-...-mixed_48k.m4a`），确保唯一性和可追溯性。
 - 返回：
   - `publicUrl = https://<bucket>.<endpointHost>/<objectKey>`
 - 更新：
@@ -114,7 +114,7 @@
 - 角色分离：`Transcription.DiarizationEnabled` 和 `SpeakerCount`
 
 成功后：
-- 保存 `task.tingwuTaskId`
+- 保存 `task.transcriptionTaskId`
 - 状态进入 `polling`
 
 ### 字节跳动火山引擎 (`VolcengineService`)
@@ -158,7 +158,7 @@
 
 - **保存**：
   - `task.transcript`：纯文本格式的对话记录。
-  - `task.rawResponse`：原始 JSON 响应备份。
+  - `task.rawData`：原始 JSON 响应。
   - `task.status`：`completed` 或 `failed`。
 
 ## 转录解析器

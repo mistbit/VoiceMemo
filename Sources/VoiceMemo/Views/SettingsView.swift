@@ -704,11 +704,11 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                         }
 
-                        FormRow(label: "Audio") {
+                        FormRow(label: "Audio Link") {
                             Toggle("", isOn: $settings.emailAttachAudio)
                                 .toggleStyle(.switch)
                                 .labelsHidden()
-                            Text("Include audio recording file")
+                            Text("Include audio link in summary markdown")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }

@@ -79,19 +79,17 @@ final class MySQLStorage: StorageProvider, @unchecked Sendable {
             created_at DATETIME NOT NULL,
             recording_id VARCHAR(255) NOT NULL,
             local_file_path TEXT NOT NULL,
+            raw_local_file_path TEXT,
             oss_url TEXT,
-            tingwu_task_id VARCHAR(255),
+            transcription_task_id VARCHAR(255),
             status VARCHAR(50) NOT NULL,
             title TEXT NOT NULL,
-            raw_response TEXT,
             transcript LONGTEXT,
             summary TEXT,
             key_points TEXT,
             action_items TEXT,
             last_error TEXT,
             task_key VARCHAR(255),
-            api_status VARCHAR(50),
-            status_text TEXT,
             biz_duration INT,
             output_mp3_path TEXT,
             last_successful_status VARCHAR(50),
@@ -100,7 +98,6 @@ final class MySQLStorage: StorageProvider, @unchecked Sendable {
             original_oss_url TEXT,
             overview_data LONGTEXT,
             transcript_data LONGTEXT,
-            conversation_data LONGTEXT,
             raw_data LONGTEXT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """
@@ -125,58 +122,53 @@ final class MySQLStorage: StorageProvider, @unchecked Sendable {
             }.get()
         }
         
+        if !existingColumns.contains("raw_local_file_path") {
+            _ = try await pool.withConnection { conn in
+                conn.query("ALTER TABLE meeting_tasks ADD COLUMN raw_local_file_path TEXT")
+            }.get()
+        }
+        
         // Migration for Complete Poll Results
         if !existingColumns.contains("overview_data") {
             log("MySQLStorage createTableIfNeeded: Adding overview_data column")
             _ = try await pool.withConnection { conn in
-                conn.query("ALTER TABLE meeting_tasks ADD COLUMN overview_data TEXT")
+                conn.query("ALTER TABLE meeting_tasks ADD COLUMN overview_data LONGTEXT")
             }.get()
         }
-        
+
         if !existingColumns.contains("transcript_data") {
             log("MySQLStorage createTableIfNeeded: Adding transcript_data column")
             _ = try await pool.withConnection { conn in
-                conn.query("ALTER TABLE meeting_tasks ADD COLUMN transcript_data TEXT")
+                conn.query("ALTER TABLE meeting_tasks ADD COLUMN transcript_data LONGTEXT")
             }.get()
         }
-        
-        if !existingColumns.contains("conversation_data") {
-            log("MySQLStorage createTableIfNeeded: Adding conversation_data column")
-            _ = try await pool.withConnection { conn in
-                conn.query("ALTER TABLE meeting_tasks ADD COLUMN conversation_data TEXT")
-            }.get()
-        }
-        
+
         if !existingColumns.contains("raw_data") {
             log("MySQLStorage createTableIfNeeded: Adding raw_data column")
             _ = try await pool.withConnection { conn in
-                conn.query("ALTER TABLE meeting_tasks ADD COLUMN raw_data TEXT")
+                conn.query("ALTER TABLE meeting_tasks ADD COLUMN raw_data LONGTEXT")
             }.get()
         }
-        
+
         log("MySQLStorage createTableIfNeeded: Table creation/migration completed")
-        
+
         // Upgrade existing text columns to LONGTEXT to support large data
         _ = try? await pool.withConnection { conn in
             conn.query("ALTER TABLE meeting_tasks MODIFY COLUMN transcript LONGTEXT")
         }.get()
-        
+
         _ = try? await pool.withConnection { conn in
             conn.query("ALTER TABLE meeting_tasks MODIFY COLUMN overview_data LONGTEXT")
         }.get()
-        
+
         _ = try? await pool.withConnection { conn in
             conn.query("ALTER TABLE meeting_tasks MODIFY COLUMN transcript_data LONGTEXT")
         }.get()
-        
-        _ = try? await pool.withConnection { conn in
-            conn.query("ALTER TABLE meeting_tasks MODIFY COLUMN conversation_data LONGTEXT")
-        }.get()
-        
+
         _ = try? await pool.withConnection { conn in
             conn.query("ALTER TABLE meeting_tasks MODIFY COLUMN raw_data LONGTEXT")
         }.get()
-        
+
         log("MySQLStorage createTableIfNeeded: Column upgrade completed")
     }
     
@@ -199,53 +191,50 @@ final class MySQLStorage: StorageProvider, @unchecked Sendable {
         log("MySQLStorage saveTask: Saving task \(task.id)")
         log("MySQLStorage saveTask: overviewData = \(task.overviewData?.prefix(100) ?? "nil")")
         log("MySQLStorage saveTask: transcriptData = \(task.transcriptData?.prefix(100) ?? "nil")")
-        log("MySQLStorage saveTask: conversationData = \(task.conversationData?.prefix(100) ?? "nil")")
         log("MySQLStorage saveTask: rawData = \(task.rawData?.prefix(100) ?? "nil")")
-        
+
         let sql = """
         INSERT INTO meeting_tasks (
-            id, created_at, recording_id, local_file_path, oss_url, tingwu_task_id,
-            status, title, raw_response, transcript, summary, key_points,
-            action_items, last_error, task_key, api_status, status_text,
+            id, created_at, recording_id, local_file_path, raw_local_file_path, oss_url, transcription_task_id,
+            status, title, transcript, summary, key_points,
+            action_items, last_error, task_key,
             biz_duration, output_mp3_path, last_successful_status, failed_step,
             retry_count, original_oss_url,
-            overview_data, transcript_data, conversation_data, raw_data
+            overview_data, transcript_data, raw_data
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         ) ON DUPLICATE KEY UPDATE
-            recording_id=VALUES(recording_id), local_file_path=VALUES(local_file_path),
-            oss_url=VALUES(oss_url), tingwu_task_id=VALUES(tingwu_task_id),
-            status=VALUES(status), title=VALUES(title), raw_response=VALUES(raw_response),
+            recording_id=VALUES(recording_id), local_file_path=VALUES(local_file_path), raw_local_file_path=VALUES(raw_local_file_path),
+            oss_url=VALUES(oss_url), transcription_task_id=VALUES(transcription_task_id),
+            status=VALUES(status), title=VALUES(title),
             transcript=VALUES(transcript), summary=VALUES(summary), key_points=VALUES(key_points),
             action_items=VALUES(action_items), last_error=VALUES(last_error),
-            task_key=VALUES(task_key), api_status=VALUES(api_status), status_text=VALUES(status_text),
+            task_key=VALUES(task_key),
             biz_duration=VALUES(biz_duration), output_mp3_path=VALUES(output_mp3_path),
             last_successful_status=VALUES(last_successful_status), failed_step=VALUES(failed_step),
             retry_count=VALUES(retry_count),
             original_oss_url=VALUES(original_oss_url),
             overview_data=VALUES(overview_data), transcript_data=VALUES(transcript_data),
-            conversation_data=VALUES(conversation_data), raw_data=VALUES(raw_data);
+            raw_data=VALUES(raw_data);
         """
-        
+
         _ = try await pool.withConnection { conn in
             let binds: [MySQLData] = [
                 MySQLData(string: task.id.uuidString),
                 MySQLData(date: task.createdAt),
                 MySQLData(string: task.recordingId),
                 MySQLData(string: task.localFilePath),
+                task.rawLocalFilePath.map { MySQLData(string: $0) } ?? .null,
                 task.ossUrl.map { MySQLData(string: $0) } ?? .null,
-                task.tingwuTaskId.map { MySQLData(string: $0) } ?? .null,
+                task.transcriptionTaskId.map { MySQLData(string: $0) } ?? .null,
                 MySQLData(string: task.status.rawValue),
                 MySQLData(string: task.title),
-                task.rawResponse.map { MySQLData(string: $0) } ?? .null,
                 task.transcript.map { MySQLData(string: $0) } ?? .null,
                 task.summary.map { MySQLData(string: $0) } ?? .null,
                 task.keyPoints.map { MySQLData(string: $0) } ?? .null,
                 task.actionItems.map { MySQLData(string: $0) } ?? .null,
                 task.lastError.map { MySQLData(string: $0) } ?? .null,
                 task.taskKey.map { MySQLData(string: $0) } ?? .null,
-                task.apiStatus.map { MySQLData(string: $0) } ?? .null,
-                task.statusText.map { MySQLData(string: $0) } ?? .null,
                 task.bizDuration.map { MySQLData(int: $0) } ?? .null,
                 task.outputMp3Path.map { MySQLData(string: $0) } ?? .null,
                 task.lastSuccessfulStatus.map { MySQLData(string: $0.rawValue) } ?? .null,
@@ -254,7 +243,6 @@ final class MySQLStorage: StorageProvider, @unchecked Sendable {
                 task.originalOssUrl.map { MySQLData(string: $0) } ?? .null,
                 task.overviewData.map { MySQLData(string: $0) } ?? .null,
                 task.transcriptData.map { MySQLData(string: $0) } ?? .null,
-                task.conversationData.map { MySQLData(string: $0) } ?? .null,
                 task.rawData.map { MySQLData(string: $0) } ?? .null
             ]
             return conn.query(sql, binds)
@@ -310,26 +298,24 @@ final class MySQLStorage: StorageProvider, @unchecked Sendable {
               let status = MeetingTaskStatus.from(rawValue: statusRaw) else {
             return nil
         }
-        
+
         let task = MeetingTask(recordingId: recordingId, localFilePath: localFilePath, title: title)
         task.id = uuid
         task.createdAt = createdAt
         task.status = status
-        
+
+        task.rawLocalFilePath = row.column("raw_local_file_path")?.string
         task.ossUrl = row.column("oss_url")?.string
-        task.tingwuTaskId = row.column("tingwu_task_id")?.string
-        task.rawResponse = row.column("raw_response")?.string
+        task.transcriptionTaskId = row.column("transcription_task_id")?.string
         task.transcript = row.column("transcript")?.string
         task.summary = row.column("summary")?.string
         task.keyPoints = row.column("key_points")?.string
         task.actionItems = row.column("action_items")?.string
         task.lastError = row.column("last_error")?.string
         task.taskKey = row.column("task_key")?.string
-        task.apiStatus = row.column("api_status")?.string
-        task.statusText = row.column("status_text")?.string
         task.bizDuration = row.column("biz_duration")?.int
         task.outputMp3Path = row.column("output_mp3_path")?.string
-        
+
         if let successStatusRaw = row.column("last_successful_status")?.string,
            let successStatus = MeetingTaskStatus.from(rawValue: successStatusRaw) {
             task.lastSuccessfulStatus = successStatus
@@ -339,13 +325,12 @@ final class MySQLStorage: StorageProvider, @unchecked Sendable {
             task.failedStep = failedStep
         }
         task.retryCount = row.column("retry_count")?.int ?? 0
-        
+
         task.originalOssUrl = row.column("original_oss_url")?.string
         task.overviewData = row.column("overview_data")?.string
         task.transcriptData = row.column("transcript_data")?.string
-        task.conversationData = row.column("conversation_data")?.string
         task.rawData = row.column("raw_data")?.string
-        
+
         return task
     }
 }

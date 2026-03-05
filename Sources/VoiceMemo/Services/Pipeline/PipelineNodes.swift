@@ -50,7 +50,14 @@ class UploadOriginalNode: PipelineNode {
         let datePath = board.formattedDatePath()
         
         let fileURL = URL(fileURLWithPath: inputPath)
-        let filename = channelId == 0 ? "mixed_raw.m4a" : "speaker\(channelId)_raw.m4a"
+        
+        // Fix: Use input filename to ensure uniqueness (e.g. includes UUID/timestamp)
+        var inputFilename = fileURL.deletingPathExtension().lastPathComponent
+        if !inputFilename.hasSuffix("_raw") {
+            inputFilename += "_raw"
+        }
+        let filename = "\(inputFilename).m4a"
+        
         let objectKey = "\(board.config.ossPrefix)\(datePath)/\(board.recordingId)/\(filename)"
         
         let url = try await services.ossService.uploadFile(fileURL: fileURL, objectKey: objectKey)
@@ -76,14 +83,34 @@ class TranscodeNode: PipelineNode {
         
         // 2. Prepare Output Path
         let inputURL = URL(fileURLWithPath: inputPath)
-        let outputFilename = channelId == 0 ? "mixed_48k.m4a" : "speaker\(channelId)_48k.m4a"
+        
+        // Fix: Use input filename as base + timestamp to ensure uniqueness and avoid collisions
+        var inputFilename = inputURL.deletingPathExtension().lastPathComponent
+        
+        // Avoid recursive suffixing if re-running on already processed file
+        if inputFilename.hasSuffix("_48k") {
+            inputFilename = String(inputFilename.dropLast(4))
+        }
+        
+        // Append timestamp from task creation date to ensure global uniqueness per task
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let timestamp = formatter.string(from: board.creationDate)
+        
+        // If filename already contains this timestamp, don't append it again
+        let outputFilename: String
+        if inputFilename.contains(timestamp) {
+            outputFilename = "\(inputFilename)_48k.m4a"
+        } else {
+            outputFilename = "\(inputFilename)-\(timestamp)_48k.m4a"
+        }
+        
         let outputURL = inputURL.deletingLastPathComponent().appendingPathComponent(outputFilename)
         
-        // 3. Idempotency Check
+        // 3. Force Overwrite (User requirement: "If file exists, overwrite it")
         if FileManager.default.fileExists(atPath: outputURL.path) {
-            print("TranscodeNode: Processed file exists, skipping transcode.")
-            board.updateChannel(channelId) { $0.processedAudioPath = outputURL.path }
-            return
+            print("TranscodeNode: Output file exists, deleting to overwrite: \(outputURL.path)")
+            try? FileManager.default.removeItem(at: outputURL)
         }
         
         // 4. Execution (Always transcode for now to ensure quality)
@@ -136,8 +163,14 @@ class UploadNode: PipelineNode {
         let datePath = board.formattedDatePath()
         
         let fileURL = URL(fileURLWithPath: inputPath)
-        // Note: Keeping legacy naming convention (mixed.m4a instead of mixed_48k.m4a in OSS) for consistency with existing data
-        let filename = channelId == 0 ? "mixed.m4a" : "speaker\(channelId).m4a"
+        
+        // Use input filename logic to ensure uniqueness and correct extension
+        let inputFilename = fileURL.deletingPathExtension().lastPathComponent
+        // Remove "_48k" suffix if present to avoid duplication in OSS key if desired, 
+        // OR just keep it as is. User asked for uniqueness like local/remote.
+        // Let's use the file's actual name to be safe and unique.
+        let filename = "\(inputFilename).m4a"
+        
         let objectKey = "\(board.config.ossPrefix)\(datePath)/\(board.recordingId)/\(filename)"
         
         let url = try await services.ossService.uploadFile(fileURL: fileURL, objectKey: objectKey)
@@ -157,12 +190,21 @@ class CreateTaskNode: PipelineNode {
     func run(board: inout PipelineBoard, services: ServiceProvider) async throws {
         // 1. Read Input
         let channel = try board.getChannel(channelId)
-        guard let url = channel.processedAudioOssURL else {
-            throw PipelineError.inputMissing("OSS URL missing")
+        
+        // 优先使用转码后的音频 URL (Processed)，如果不存在则使用原始音频 URL (Raw)
+        // 听悟建议使用 16k/48k 采样率的 m4a/mp3，所以优先用转码后的
+        let url: String
+        if let processedUrl = channel.processedAudioOssURL {
+            url = processedUrl
+        } else if let rawUrl = channel.rawAudioOssURL {
+            print("CreateTaskNode: Processed URL missing, falling back to Raw URL.")
+            url = rawUrl
+        } else {
+            throw PipelineError.inputMissing("Both Processed and Raw OSS URLs are missing")
         }
         
         // 2. Idempotency Check
-        if channel.tingwuTaskId != nil {
+        if channel.transcriptionTaskId != nil {
             print("CreateTaskNode: Task ID exists, skipping creation.")
             return
         }
@@ -172,7 +214,7 @@ class CreateTaskNode: PipelineNode {
         let taskId = try await services.transcriptionService.createTask(fileUrl: url)
         
         // 4. Write Output
-        board.updateChannel(channelId) { $0.tingwuTaskId = taskId }
+        board.updateChannel(channelId) { $0.transcriptionTaskId = taskId }
     }
 }
 
@@ -186,7 +228,7 @@ class PollingNode: PipelineNode {
     func run(board: inout PipelineBoard, services: ServiceProvider) async throws {
         // 1. Read Input
         let channel = try board.getChannel(channelId)
-        guard let taskId = channel.tingwuTaskId else {
+        guard let taskId = channel.transcriptionTaskId else {
             throw PipelineError.inputMissing("Task ID missing")
         }
         
@@ -194,27 +236,22 @@ class PollingNode: PipelineNode {
         let (status, data) = try await services.transcriptionService.getTaskInfo(taskId: taskId)
         
         // 3. Write Status
-        board.updateChannel(channelId) { 
-            $0.tingwuTaskStatus = status 
-            $0.apiStatus = status
-            
+        board.updateChannel(channelId) {
+            $0.transcriptionTaskStatus = status
+
             if let data = data {
                 // Volcengine: audio_info.duration
                 if let audioInfo = data["audio_info"] as? [String: Any],
                    let duration = audioInfo["duration"] as? Int {
                     $0.bizDuration = duration
                 }
-                
-                // Tingwu: TaskKey, StatusText
+
+                // Tingwu: TaskKey
                 if let taskKey = data["TaskKey"] as? String {
                     $0.taskKey = taskKey
                 } else {
                     // Fallback for Volcengine: Use the Request ID (taskId) as Task Key
                     $0.taskKey = taskId
-                }
-                
-                if let statusText = data["StatusText"] as? String {
-                    $0.statusText = statusText
                 }
             }
         }
@@ -230,15 +267,13 @@ class PollingNode: PipelineNode {
                 // Fetch complete data for database storage
                 let overviewData = await fetchOverviewData(from: result, service: services.transcriptionService)
                 let transcriptData = await fetchTranscriptData(from: result, service: services.transcriptionService)
-                let conversationData = await fetchConversationData(from: result, service: services.transcriptionService)
                 let rawData = await fetchRawData(from: data, service: services.transcriptionService)
-                
+
                 // 4. Write Output
                 board.updateChannel(channelId) {
                     $0.transcript = TingwuResult(text: transcriptText, summary: summaryText)
                     $0.overviewData = overviewData
                     $0.transcriptData = transcriptData
-                    $0.conversationData = conversationData
                     $0.rawData = rawData
                 }
             } else if let result = data?["result"] as? [String: Any] {
@@ -246,15 +281,14 @@ class PollingNode: PipelineNode {
                  // Direct parsing from the result object
                  // result contains 'text' and 'utterances'
                  let transcriptText = TranscriptParser.buildTranscriptText(from: result)
-                 
+
                  let rawData = await fetchRawData(from: data, service: services.transcriptionService)
                  let transcriptData = await fetchRawData(from: result, service: services.transcriptionService) // Save result as transcript data
-                 
+
                  board.updateChannel(channelId) {
                      $0.transcript = TingwuResult(text: transcriptText, summary: nil)
                      $0.overviewData = nil // No summary yet
                      $0.transcriptData = transcriptData
-                     $0.conversationData = nil
                      $0.rawData = rawData
                  }
             }
@@ -336,17 +370,7 @@ class PollingNode: PipelineNode {
         }
         return nil
     }
-    
-    private func fetchConversationData(from result: [String: Any], service: TranscriptionService) async -> String? {
-        // Try to fetch conversation data if available
-        if let conversationUrl = result["Conversation"] as? String {
-            if let data = try? await service.fetchJSON(url: conversationUrl) {
-                return jsonString(from: data)
-            }
-        }
-        return nil
-    }
-    
+
     private func fetchRawData(from data: [String: Any]?, service: TranscriptionService) async -> String? {
         // Store the complete raw response data
         guard let data = data else { return nil }

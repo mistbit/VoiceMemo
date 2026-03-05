@@ -67,7 +67,7 @@ Provider selection is controlled by `SettingsStore.asrProvider` and wired in `Me
 
 - Purpose: Backup the original high-fidelity audio (e.g., m4a/wav) before transcoding.
 - Object key format:
-  - `"<ossPrefix><yyyy/MM/dd>/<recordingId>/original.<ext>"`
+  - `"<ossPrefix><yyyy/MM/dd>/<recordingId>/<original_filename>_raw.m4a"`
 - Updates:
   - `task.originalFileUrl`
   - `task.status`: `recorded` → `uploadingRaw` → `uploadedRaw`
@@ -77,7 +77,10 @@ Provider selection is controlled by `SettingsStore.asrProvider` and wired in `Me
 `MeetingPipelineManager.transcode()` triggers the full pipeline start. The actual work is performed by `TranscodeNode`.
 
 - Input: `task.localFilePath` (typically `...mixed.m4a`)
-- Output: `mixed_48k.m4a` in the same folder
+- Output: `recording-<uuid>-<timestamp>_mixed_48k.m4a` (Input filename + timestamp + `_48k`)
+- Logic:
+  - Appends timestamp (yyyyMMdd-HHmmss) to ensure uniqueness
+  - Force overwrites if file exists
 - Uses `AVAssetExportSession` with preset `AVAssetExportPresetAppleM4A`
 - Updates:
   - `task.localFilePath` to the transcoded file
@@ -88,9 +91,9 @@ Provider selection is controlled by `SettingsStore.asrProvider` and wired in `Me
 `UploadNode` → `OSSService.uploadFile()`:
 
 - Object key format:
-  - `"<ossPrefix><yyyy/MM/dd>/<recordingId>/mixed.m4a"`
+  - `"<ossPrefix><yyyy/MM/dd>/<recordingId>/<transcoded_filename>.m4a"`
 - Notes:
-  - Local transcoded filename uses `mixed_48k.m4a`, but the OSS object key remains `mixed.m4a`.
+  - The OSS object key will directly use the local transcoded filename (e.g., `recording-...-mixed_48k.m4a`) to ensure uniqueness and traceability.
 - Returns:
   - `publicUrl` computed as `https://<bucket>.<endpointHost>/<objectKey>`
 - Updates:
@@ -122,7 +125,7 @@ Feature toggles influence parameters:
 
 On success:
 
-- Saves `task.tingwuTaskId`
+- Saves `task.transcriptionTaskId`
 - Moves status to `polling`
 
 ### ByteDance Volcengine
@@ -156,7 +159,7 @@ On success:
 
 - Calls `activeTranscriptionService.getTaskInfo(taskId:)`
 - On `SUCCESS` / `COMPLETED`:
-  - Persists raw `Data` object (pretty JSON) into `task.rawResponse`
+  - Persists raw `Data` object (pretty JSON) into `task.rawData`
   - Extracts:
     - Uses **`TranscriptParser`** to unify transcript result parsing across providers.
     - Transcript: Provider-specific format → `TranscriptParser` parses to text.

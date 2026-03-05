@@ -47,14 +47,12 @@ struct ChannelData {
     var processedAudioPath: String?   // 本地路径 (如 16k/48k m4a)
     var processedAudioOssURL: String? // OSS URL (用于提交给听悟)
     
-    // 3. 听悟任务
-    var tingwuTaskId: String?
-    var tingwuTaskStatus: String?     // e.g. "RUNNING", "COMPLETE"
+    // 3. Transcription Task
+    var transcriptionTaskId: String?
+    var transcriptionTaskStatus: String?     // e.g. "RUNNING", "COMPLETE"
     
     // Additional Task Info
     var taskKey: String?
-    var apiStatus: String?
-    var statusText: String?
     var bizDuration: Int?
     
     // 4. 最终产物
@@ -63,7 +61,6 @@ struct ChannelData {
     // 5. 完整轮询结果 (用于数据库存储)
     var overviewData: String?     // 概览数据 (JSON String)
     var transcriptData: String?   // 转录数据 (JSON String)
-    var conversationData: String? // 对话数据 (JSON String)
     var rawData: String?          // 原始数据 (JSON String)
     
     // 6. 错误追踪 (用于单路重试)

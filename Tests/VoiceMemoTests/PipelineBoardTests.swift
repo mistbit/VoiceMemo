@@ -77,8 +77,8 @@ final class PipelineBoardTests: XCTestCase {
             channel.rawAudioOssURL = "https://oss.example.com/test.m4a"
             channel.processedAudioPath = "/tmp/test_48k.m4a"
             channel.processedAudioOssURL = "https://oss.example.com/test_48k.m4a"
-            channel.tingwuTaskId = "task-123"
-            channel.tingwuTaskStatus = "RUNNING"
+            channel.transcriptionTaskId = "task-123"
+            channel.transcriptionTaskStatus = "RUNNING"
         }
         
         let channel = board.channels[0]
@@ -87,8 +87,8 @@ final class PipelineBoardTests: XCTestCase {
         XCTAssertEqual(channel?.rawAudioOssURL, "https://oss.example.com/test.m4a")
         XCTAssertEqual(channel?.processedAudioPath, "/tmp/test_48k.m4a")
         XCTAssertEqual(channel?.processedAudioOssURL, "https://oss.example.com/test_48k.m4a")
-        XCTAssertEqual(channel?.tingwuTaskId, "task-123")
-        XCTAssertEqual(channel?.tingwuTaskStatus, "RUNNING")
+        XCTAssertEqual(channel?.transcriptionTaskId, "task-123")
+        XCTAssertEqual(channel?.transcriptionTaskStatus, "RUNNING")
     }
     
     func testFormattedDatePath() {

@@ -10,37 +10,33 @@ class SQLiteStorage: StorageProvider {
     private let createdAt = Expression<Date>("created_at")
     private let recordingId = Expression<String>("recording_id")
     private let localFilePath = Expression<String>("local_file_path")
+    private let rawLocalFilePath = Expression<String?>("raw_local_file_path")
     private let ossUrl = Expression<String?>("oss_url")
-    private let tingwuTaskId = Expression<String?>("tingwu_task_id")
+    private let transcriptionTaskId = Expression<String?>("transcription_task_id")
     private let status = Expression<String>("status")
     private let title = Expression<String>("title")
-    private let rawResponse = Expression<String?>("raw_response")
     private let transcript = Expression<String?>("transcript")
     private let summary = Expression<String?>("summary")
     private let keyPoints = Expression<String?>("key_points")
     private let actionItems = Expression<String?>("action_items")
     private let lastError = Expression<String?>("last_error")
-    
-    // New Fields
+
+    // Task Info Fields
     private let taskKey = Expression<String?>("task_key")
-    private let apiStatus = Expression<String?>("api_status")
-    private let statusText = Expression<String?>("status_text")
     private let bizDuration = Expression<Int?>("biz_duration")
     private let outputMp3Path = Expression<String?>("output_mp3_path")
-    
-    // New Fields for Retry
+
+    // Retry Fields
     private let lastSuccessfulStatus = Expression<String?>("last_successful_status")
     private let failedStep = Expression<String?>("failed_step")
     private let retryCount = Expression<Int>("retry_count")
-    
-    // New Fields for Separated Mode (Removed)
-    
+
+    // OSS URL Fields
     private let originalOssUrl = Expression<String?>("original_oss_url")
-    
-    // New Fields for Complete Poll Results
+
+    // Poll Results Storage
     private let overviewData = Expression<String?>("overview_data")
-    private let transcriptData = Expression<String?>("transcript_data") 
-    private let conversationData = Expression<String?>("conversation_data")
+    private let transcriptData = Expression<String?>("transcript_data")
     private let rawData = Expression<String?>("raw_data")
     
     init() {
@@ -94,52 +90,41 @@ class SQLiteStorage: StorageProvider {
                 t.column(createdAt)
                 t.column(recordingId)
                 t.column(localFilePath)
+                t.column(rawLocalFilePath)
                 t.column(ossUrl)
-                t.column(tingwuTaskId)
+                t.column(transcriptionTaskId)
                 t.column(status)
                 t.column(title)
-                t.column(rawResponse)
                 t.column(transcript)
                 t.column(summary)
                 t.column(keyPoints)
                 t.column(actionItems)
                 t.column(lastError)
                 t.column(taskKey)
-                t.column(apiStatus)
-                t.column(statusText)
                 t.column(bizDuration)
                 t.column(outputMp3Path)
                 t.column(lastSuccessfulStatus)
                 t.column(failedStep)
                 t.column(retryCount, defaultValue: 0)
-                
-                // Separated Mode (Removed)
                 t.column(originalOssUrl)
                 t.column(overviewData)
                 t.column(transcriptData)
-                t.column(conversationData)
                 t.column(rawData)
             })
-            
+
             // Migration for existing tables - only add if they don't exist
             let existingColumns = getColumnNames()
-            
+
             if !existingColumns.contains("task_key") { _ = try? db.run(tasks.addColumn(taskKey)) }
-            if !existingColumns.contains("api_status") { _ = try? db.run(tasks.addColumn(apiStatus)) }
-            if !existingColumns.contains("status_text") { _ = try? db.run(tasks.addColumn(statusText)) }
             if !existingColumns.contains("biz_duration") { _ = try? db.run(tasks.addColumn(bizDuration)) }
             if !existingColumns.contains("output_mp3_path") { _ = try? db.run(tasks.addColumn(outputMp3Path)) }
+            if !existingColumns.contains("raw_local_file_path") { _ = try? db.run(tasks.addColumn(rawLocalFilePath)) }
             if !existingColumns.contains("last_successful_status") { _ = try? db.run(tasks.addColumn(lastSuccessfulStatus)) }
             if !existingColumns.contains("failed_step") { _ = try? db.run(tasks.addColumn(failedStep)) }
             if !existingColumns.contains("retry_count") { _ = try? db.run(tasks.addColumn(retryCount, defaultValue: 0)) }
-            
-            // Migration for Separated Mode (Removed)
             if !existingColumns.contains("original_oss_url") { _ = try? db.run(tasks.addColumn(originalOssUrl)) }
-            
-            // Migration for Complete Poll Results
             if !existingColumns.contains("overview_data") { _ = try? db.run(tasks.addColumn(overviewData)) }
             if !existingColumns.contains("transcript_data") { _ = try? db.run(tasks.addColumn(transcriptData)) }
-            if !existingColumns.contains("conversation_data") { _ = try? db.run(tasks.addColumn(conversationData)) }
             if !existingColumns.contains("raw_data") { _ = try? db.run(tasks.addColumn(rawData)) }
         } catch {
             print("Create table error: \(error)")
@@ -165,25 +150,23 @@ class SQLiteStorage: StorageProvider {
     
     func saveTask(_ task: MeetingTask) async throws {
         guard let db = db else { return }
-        
+
         let insert = tasks.insert(or: .replace,
             id <- task.id.uuidString,
             createdAt <- task.createdAt,
             recordingId <- task.recordingId,
             localFilePath <- task.localFilePath,
+            rawLocalFilePath <- task.rawLocalFilePath,
             ossUrl <- task.ossUrl,
-            tingwuTaskId <- task.tingwuTaskId,
+            transcriptionTaskId <- task.transcriptionTaskId,
             status <- task.status.rawValue,
             title <- task.title,
-            rawResponse <- task.rawResponse,
             transcript <- task.transcript,
             summary <- task.summary,
             keyPoints <- task.keyPoints,
             actionItems <- task.actionItems,
             lastError <- task.lastError,
             taskKey <- task.taskKey,
-            apiStatus <- task.apiStatus,
-            statusText <- task.statusText,
             bizDuration <- task.bizDuration,
             outputMp3Path <- task.outputMp3Path,
             lastSuccessfulStatus <- task.lastSuccessfulStatus?.rawValue,
@@ -192,7 +175,6 @@ class SQLiteStorage: StorageProvider {
             originalOssUrl <- task.originalOssUrl,
             overviewData <- task.overviewData,
             transcriptData <- task.transcriptData,
-            conversationData <- task.conversationData,
             rawData <- task.rawData
         )
         try db.run(insert)
@@ -200,37 +182,35 @@ class SQLiteStorage: StorageProvider {
     
     func fetchTasks() async throws -> [MeetingTask] {
         guard let db = db else { return [] }
-        
+
         var results: [MeetingTask] = []
-        
+
         for row in try db.prepare(tasks.order(createdAt.desc)) {
             let task = MeetingTask(
                 recordingId: row[recordingId],
                 localFilePath: row[localFilePath],
                 title: row[title]
             )
-            
+
             if let uuid = UUID(uuidString: row[id]) {
                 task.id = uuid
             }
             task.createdAt = row[createdAt]
+            task.rawLocalFilePath = row[rawLocalFilePath]
             task.ossUrl = row[ossUrl]
-            task.tingwuTaskId = row[tingwuTaskId]
+            task.transcriptionTaskId = row[transcriptionTaskId]
             if let statusEnum = MeetingTaskStatus.from(rawValue: row[status]) {
                 task.status = statusEnum
             }
-            task.rawResponse = row[rawResponse]
             task.transcript = row[transcript]
             task.summary = row[summary]
             task.keyPoints = row[keyPoints]
             task.actionItems = row[actionItems]
             task.lastError = row[lastError]
             task.taskKey = row[taskKey]
-            task.apiStatus = row[apiStatus]
-            task.statusText = row[statusText]
             task.bizDuration = row[bizDuration]
             task.outputMp3Path = row[outputMp3Path]
-            
+
             if let successStatusRaw = row[lastSuccessfulStatus], let successStatus = MeetingTaskStatus.from(rawValue: successStatusRaw) {
                 task.lastSuccessfulStatus = successStatus
             }
@@ -238,16 +218,15 @@ class SQLiteStorage: StorageProvider {
                 task.failedStep = failedStepEnum
             }
             task.retryCount = row[retryCount]
-            
+
             task.originalOssUrl = row[originalOssUrl]
             task.overviewData = row[overviewData]
             task.transcriptData = row[transcriptData]
-            task.conversationData = row[conversationData]
             task.rawData = row[rawData]
-            
+
             results.append(task)
         }
-        
+
         return results
     }
     
@@ -266,38 +245,34 @@ class SQLiteStorage: StorageProvider {
     func getTask(id: UUID) async throws -> MeetingTask? {
         guard let db = db else { return nil }
         let query = tasks.filter(self.id == id.uuidString)
-        
+
         guard let row = try db.pluck(query) else { return nil }
-        
+
         let task = MeetingTask(
             recordingId: row[recordingId],
             localFilePath: row[localFilePath],
             title: row[title]
         )
-        
+
         if let uuid = UUID(uuidString: row[self.id]) {
             task.id = uuid
         }
         task.createdAt = row[createdAt]
+        task.rawLocalFilePath = row[rawLocalFilePath]
         task.ossUrl = row[ossUrl]
-        task.tingwuTaskId = row[tingwuTaskId]
+        task.transcriptionTaskId = row[transcriptionTaskId]
         if let statusEnum = MeetingTaskStatus.from(rawValue: row[status]) {
             task.status = statusEnum
         }
-        // ... (rest of mapping) ...
-        // To avoid code duplication, I should refactor the mapping logic, but for now I'll just copy it.
-        task.rawResponse = row[rawResponse]
         task.transcript = row[transcript]
         task.summary = row[summary]
         task.keyPoints = row[keyPoints]
         task.actionItems = row[actionItems]
         task.lastError = row[lastError]
         task.taskKey = row[taskKey]
-        task.apiStatus = row[apiStatus]
-        task.statusText = row[statusText]
         task.bizDuration = row[bizDuration]
         task.outputMp3Path = row[outputMp3Path]
-        
+
         if let successStatusRaw = row[lastSuccessfulStatus], let successStatus = MeetingTaskStatus.from(rawValue: successStatusRaw) {
             task.lastSuccessfulStatus = successStatus
         }
@@ -305,13 +280,12 @@ class SQLiteStorage: StorageProvider {
             task.failedStep = failedStepEnum
         }
         task.retryCount = row[retryCount]
-        
+
         task.originalOssUrl = row[originalOssUrl]
         task.overviewData = row[overviewData]
         task.transcriptData = row[transcriptData]
-        task.conversationData = row[conversationData]
         task.rawData = row[rawData]
-        
+
         return task
     }
 }

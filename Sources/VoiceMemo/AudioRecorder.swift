@@ -407,6 +407,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                             let dateStr = formatter.string(from: self.recordingStartTime ?? Date())
                             let title = "Rec \(dateStr)"
                             let task = MeetingTask(recordingId: recId, localFilePath: mixedURL.path, title: title)
+                            task.rawLocalFilePath = mixedURL.path
                             Task { try? await StorageManager.shared.currentProvider.saveTask(task) }
                             self.latestTask = task
                         }
@@ -430,6 +431,7 @@ class AudioRecorder: NSObject, ObservableObject, SCStreamOutput, SCStreamDelegat
                         let dateStr = formatter.string(from: self.recordingStartTime ?? Date())
                         let title = "Rec \(dateStr)"
                         let task = MeetingTask(recordingId: recId, localFilePath: finalURL.path, title: title)
+                        task.rawLocalFilePath = finalURL.path
                         Task { try? await StorageManager.shared.currentProvider.saveTask(task) }
                         self.latestTask = task
                     }
