@@ -75,23 +75,21 @@ class MeetingTask: Identifiable, ObservableObject, Hashable, Codable {
     
     // File Paths
     var localFilePath: String // Mixed audio path
+    var rawLocalFilePath: String? // Original local audio path
     
     var originalOssUrl: String? // Mixed Original OSS URL
     
     var ossUrl: String? // Mixed OSS URL
     
-    // Tingwu Info
-    var tingwuTaskId: String? // Mixed Task ID
+    // Transcription Info
+    var transcriptionTaskId: String?
     
     var taskKey: String?
-    var apiStatus: String?
-    var statusText: String?
     var bizDuration: Int?
     var status: MeetingTaskStatus = .recorded
     var title: String
     
     // Results
-    var rawResponse: String?
     var transcript: String?
     
     var summary: String?
@@ -108,7 +106,6 @@ class MeetingTask: Identifiable, ObservableObject, Hashable, Codable {
     // Complete Poll Results Storage
     var overviewData: String?
     var transcriptData: String?
-    var conversationData: String?
     var rawData: String?
     
     init(recordingId: String, localFilePath: String, title: String) {
@@ -144,7 +141,7 @@ extension MeetingTask {
         
         // Fallback: Check if we have specific fields that might hint
         // This is a weak heuristic but better than nothing for legacy data
-        if let _ = self.tingwuTaskId {
+        if let _ = self.transcriptionTaskId {
              // Both use this field currently, so it's not decisive unless we check format
              // But if we have no raw data, we might assume Tingwu as it was the default/first
              return "Unknown"
@@ -169,8 +166,6 @@ extension MeetingTask {
         
         md += "## Task Info\n"
         if let key = taskKey { md += "- Task Key: \(key)\n" }
-        if let status = apiStatus { md += "- Status: \(status)\n" }
-        if let error = statusText, !error.isEmpty { md += "- Message: \(error)\n" }
         if let duration = bizDuration { md += "- Duration: \(duration / 1000)s\n" }
         if let mp3 = outputMp3Path { md += "- Audio: [Download](\(mp3))\n" }
         md += "\n"
@@ -198,7 +193,7 @@ extension MeetingTask {
         if let transcript = transcript, !transcript.isEmpty {
             return transcript
         }
-        
+
         if let dataStr = transcriptData,
            let data = dataStr.data(using: .utf8),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -206,14 +201,8 @@ extension MeetingTask {
                 return text
             }
         }
-        
-        guard let raw = rawResponse,
-              let data = raw.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-        
-        return TranscriptParser.buildTranscriptText(from: json)
+
+        return nil
     }
     
     func safeFilename() -> String {

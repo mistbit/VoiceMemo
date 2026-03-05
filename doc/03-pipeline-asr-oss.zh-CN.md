@@ -114,7 +114,7 @@
 - 角色分离：`Transcription.DiarizationEnabled` 和 `SpeakerCount`
 
 成功后：
-- 保存 `task.tingwuTaskId`
+- 保存 `task.transcriptionTaskId`
 - 状态进入 `polling`
 
 ### 字节跳动火山引擎 (`VolcengineService`)
@@ -158,7 +158,7 @@
 
 - **保存**：
   - `task.transcript`：纯文本格式的对话记录。
-  - `task.rawResponse`：原始 JSON 响应备份。
+  - `task.rawData`：原始 JSON 响应。
   - `task.status`：`completed` 或 `failed`。
 
 ## 转录解析器

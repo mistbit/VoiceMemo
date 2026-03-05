@@ -125,7 +125,7 @@ Feature toggles influence parameters:
 
 On success:
 
-- Saves `task.tingwuTaskId`
+- Saves `task.transcriptionTaskId`
 - Moves status to `polling`
 
 ### ByteDance Volcengine
@@ -159,7 +159,7 @@ On success:
 
 - Calls `activeTranscriptionService.getTaskInfo(taskId:)`
 - On `SUCCESS` / `COMPLETED`:
-  - Persists raw `Data` object (pretty JSON) into `task.rawResponse`
+  - Persists raw `Data` object (pretty JSON) into `task.rawData`
   - Extracts:
     - Uses **`TranscriptParser`** to unify transcript result parsing across providers.
     - Transcript: Provider-specific format → `TranscriptParser` parses to text.

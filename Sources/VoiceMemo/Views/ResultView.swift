@@ -126,7 +126,7 @@ struct ResultView: View {
                 case .transcript:
                     TranscriptView(text: task.derivedTranscriptText() ?? "No transcript available.")
                 case .raw:
-                    RawDataView(text: task.rawData ?? task.rawResponse ?? "No raw response.")
+                    RawDataView(text: task.rawData ?? "No raw data available.")
                 case .pipeline:
                     PipelineView(task: task, settings: settings, playback: playback) {
                         withAnimation {
@@ -150,32 +150,24 @@ struct ResultView: View {
 
         // Prepare summary attachment
         if settings.emailAttachSummary {
-            let mdContent = task.markdownSummary()
+            var mdContent = task.markdownSummary()
+            if settings.emailAttachAudio {
+                var links: [String] = []
+                if let url = task.ossUrl { links.append("- Processed: \(url)") }
+                if let url = task.originalOssUrl { links.append("- Original: \(url)") }
+                if let url = task.outputMp3Path { links.append("- MP3: \(url)") }
+                if !links.isEmpty {
+                    mdContent += "## Audio Links\n"
+                    mdContent += links.joined(separator: "\n")
+                    mdContent += "\n\n"
+                }
+            }
             let mdFilename = baseFilename.appending(".md")
             let mdUrl = FileManager.default.temporaryDirectory.appendingPathComponent(mdFilename)
             if let mdData = mdContent.data(using: .utf8) {
                 try? mdData.write(to: mdUrl)
                 tempFiles.append(mdUrl)
                 attachmentPaths.append(mdUrl.path)
-            }
-        }
-
-        // Prepare audio attachment
-        if settings.emailAttachAudio {
-            // Check for local file first
-            var audioPath: String?
-            if FileManager.default.fileExists(atPath: task.localFilePath) {
-                audioPath = task.localFilePath
-            } else if let mp3UrlString = task.outputMp3Path, let mp3Url = URL(string: mp3UrlString) {
-                // Try to download from URL
-                if let tempMp3Url = try? await downloadFile(from: mp3Url) {
-                    tempFiles.append(tempMp3Url)
-                    audioPath = tempMp3Url.path
-                }
-            }
-
-            if let path = audioPath {
-                attachmentPaths.append(path)
             }
         }
 
@@ -192,7 +184,7 @@ struct ResultView: View {
 
         // Prepare raw data attachment
         if settings.emailAttachRawData {
-            if let rawDataStr = task.rawData ?? task.rawResponse {
+            if let rawDataStr = task.rawData {
                 let rawFilename = baseFilename.appending("-raw.json")
                 let rawUrl = FileManager.default.temporaryDirectory.appendingPathComponent(rawFilename)
                 if let rawData = rawDataStr.data(using: .utf8) {
@@ -228,13 +220,6 @@ struct ResultView: View {
         emailStatus = nil
     }
 
-    private func downloadFile(from url: URL) async throws -> URL {
-        let (tempUrl, _) = try await URLSession.shared.download(from: url)
-        let destination = FileManager.default.temporaryDirectory.appendingPathComponent(url.lastPathComponent)
-        try FileManager.default.moveItem(at: tempUrl, to: destination)
-        return destination
-    }
-    
     private func exportMarkdown() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
@@ -307,35 +292,7 @@ struct TaskInfoView: View {
                         }
                     }
                 }
-                
-                if let status = task.apiStatus {
-                    GridRow {
-                        Text("Status")
-                            .foregroundColor(.secondary)
-                            .gridColumnAlignment(.trailing)
-                        
-                        HStack {
-                            Circle()
-                                .fill(statusColor(status))
-                                .frame(width: 8, height: 8)
-                            Text(status)
-                                .font(.subheadline)
-                        }
-                    }
-                }
-                
-                if let error = task.statusText, !error.isEmpty {
-                    GridRow {
-                        Text("Message")
-                            .foregroundColor(.secondary)
-                            .gridColumnAlignment(.trailing)
-                            
-                        Text(error)
-                            .font(.subheadline)
-                            .foregroundColor(.red)
-                    }
-                }
-                
+
                 if let duration = task.bizDuration {
                     GridRow {
                         Text("Duration")
@@ -369,18 +326,6 @@ struct TaskInfoView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.gray.opacity(0.1), lineWidth: 1)
         )
-    }
-    
-    private func statusColor(_ status: String) -> Color {
-        let s = status.uppercased()
-        if s == "SUCCESS" || s == "COMPLETED" || s == "20000000" {
-            return .green
-        } else if s == "RUNNING" || s == "POLLING" {
-            return .blue
-        } else if s == "FAILED" {
-            return .red
-        }
-        return .secondary
     }
 }
 

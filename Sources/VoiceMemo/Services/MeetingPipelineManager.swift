@@ -75,7 +75,7 @@ class MeetingPipelineManager: ObservableObject {
         resetTask.status = .recorded
         resetTask.originalOssUrl = nil
         resetTask.ossUrl = nil
-        resetTask.tingwuTaskId = nil
+        resetTask.transcriptionTaskId = nil
         resetTask.transcript = nil
         resetTask.summary = nil
         resetTask.failedStep = nil
@@ -201,28 +201,24 @@ class MeetingPipelineManager: ObservableObject {
         
         // Prepare summary attachment
         if settings.emailAttachSummary {
-            let mdContent = task.markdownSummary()
+            var mdContent = task.markdownSummary()
+            if settings.emailAttachAudio {
+                var links: [String] = []
+                if let url = task.ossUrl { links.append("- Processed: \(url)") }
+                if let url = task.originalOssUrl { links.append("- Original: \(url)") }
+                if let url = task.outputMp3Path { links.append("- MP3: \(url)") }
+                if !links.isEmpty {
+                    mdContent += "## Audio Links\n"
+                    mdContent += links.joined(separator: "\n")
+                    mdContent += "\n\n"
+                }
+            }
             let mdFilename = baseFilename.appending(".md")
             let mdUrl = FileManager.default.temporaryDirectory.appendingPathComponent(mdFilename)
             if let mdData = mdContent.data(using: .utf8) {
                 try? mdData.write(to: mdUrl)
                 tempFiles.append(mdUrl)
                 attachmentPaths.append(mdUrl.path)
-            }
-        }
-        
-        // Prepare audio attachment
-        if settings.emailAttachAudio {
-            if FileManager.default.fileExists(atPath: task.localFilePath) {
-                attachmentPaths.append(task.localFilePath)
-            } else if let mp3UrlString = task.outputMp3Path, let mp3Url = URL(string: mp3UrlString) {
-                // Try to download from URL
-                if let (tempUrl, _) = try? await URLSession.shared.download(from: mp3Url) {
-                    let destination = FileManager.default.temporaryDirectory.appendingPathComponent(mp3Url.lastPathComponent)
-                    try? FileManager.default.moveItem(at: tempUrl, to: destination)
-                    tempFiles.append(destination)
-                    attachmentPaths.append(destination.path)
-                }
             }
         }
         
@@ -239,7 +235,7 @@ class MeetingPipelineManager: ObservableObject {
         
         // Prepare raw data attachment
         if settings.emailAttachRawData {
-            if let rawDataStr = task.rawData ?? task.rawResponse {
+            if let rawDataStr = task.rawData {
                 let rawFilename = baseFilename.appending("-raw.json")
                 let rawUrl = FileManager.default.temporaryDirectory.appendingPathComponent(rawFilename)
                 if let rawData = rawDataStr.data(using: .utf8) {
@@ -297,56 +293,55 @@ class MeetingPipelineManager: ObservableObject {
         // Hydrate Mixed Channel (0)
         var mixed = ChannelData()
         
-        // Fix: Resolve processed path if missing
+        if let rawPath = task.rawLocalFilePath, !rawPath.isEmpty {
+            mixed.rawAudioPath = rawPath
+        }
+        
         let path = task.localFilePath
         if !path.isEmpty {
             if path.hasSuffix("_48k.m4a") {
                 mixed.processedAudioPath = path
-                mixed.rawAudioPath = path // Fallback
-            } else {
+            } else if mixed.rawAudioPath == nil {
                 mixed.rawAudioPath = path
-                // Check for existing processed file
-                let url = URL(fileURLWithPath: path)
-                let inputFilename = url.deletingPathExtension().lastPathComponent
-                
-                // 1. Try timestamped naming convention (recording-uuid-timestamp_48k.m4a)
-                let formatter = DateFormatter()
-                formatter.dateFormat = "yyyyMMdd-HHmmss"
-                let timestamp = formatter.string(from: task.createdAt)
-                
-                let timestampedFilename: String
-                if inputFilename.contains(timestamp) {
-                    timestampedFilename = "\(inputFilename)_48k.m4a"
-                } else {
-                    timestampedFilename = "\(inputFilename)-\(timestamp)_48k.m4a"
-                }
-                let timestampedUrl = url.deletingLastPathComponent().appendingPathComponent(timestampedFilename)
-                
-                // 2. Try input-based naming convention (recording-uuid_48k.m4a)
-                let newProcessedFilename = "\(inputFilename)_48k.m4a"
-                let newProcessedUrl = url.deletingLastPathComponent().appendingPathComponent(newProcessedFilename)
-                
-                if FileManager.default.fileExists(atPath: timestampedUrl.path) {
-                    mixed.processedAudioPath = timestampedUrl.path
-                } else if FileManager.default.fileExists(atPath: newProcessedUrl.path) {
-                    mixed.processedAudioPath = newProcessedUrl.path
-                } else {
-                    // 3. Fallback to legacy naming convention
-                    let legacyProcessedFilename = "mixed_48k.m4a"
-                    let legacyProcessedUrl = url.deletingLastPathComponent().appendingPathComponent(legacyProcessedFilename)
-                    if FileManager.default.fileExists(atPath: legacyProcessedUrl.path) {
-                        mixed.processedAudioPath = legacyProcessedUrl.path
-                    }
+            }
+        }
+        
+        if let rawPath = mixed.rawAudioPath, !rawPath.isEmpty, mixed.processedAudioPath == nil {
+            let url = URL(fileURLWithPath: rawPath)
+            let inputFilename = url.deletingPathExtension().lastPathComponent
+            
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyyMMdd-HHmmss"
+            let timestamp = formatter.string(from: task.createdAt)
+            
+            let timestampedFilename: String
+            if inputFilename.contains(timestamp) {
+                timestampedFilename = "\(inputFilename)_48k.m4a"
+            } else {
+                timestampedFilename = "\(inputFilename)-\(timestamp)_48k.m4a"
+            }
+            let timestampedUrl = url.deletingLastPathComponent().appendingPathComponent(timestampedFilename)
+            
+            let newProcessedFilename = "\(inputFilename)_48k.m4a"
+            let newProcessedUrl = url.deletingLastPathComponent().appendingPathComponent(newProcessedFilename)
+            
+            if FileManager.default.fileExists(atPath: timestampedUrl.path) {
+                mixed.processedAudioPath = timestampedUrl.path
+            } else if FileManager.default.fileExists(atPath: newProcessedUrl.path) {
+                mixed.processedAudioPath = newProcessedUrl.path
+            } else {
+                let legacyProcessedFilename = "mixed_48k.m4a"
+                let legacyProcessedUrl = url.deletingLastPathComponent().appendingPathComponent(legacyProcessedFilename)
+                if FileManager.default.fileExists(atPath: legacyProcessedUrl.path) {
+                    mixed.processedAudioPath = legacyProcessedUrl.path
                 }
             }
         }
         
         mixed.rawAudioOssURL = task.originalOssUrl
         mixed.processedAudioOssURL = task.ossUrl
-        mixed.tingwuTaskId = task.tingwuTaskId
+        mixed.transcriptionTaskId = task.transcriptionTaskId
         mixed.taskKey = task.taskKey
-        mixed.apiStatus = task.apiStatus
-        mixed.statusText = task.statusText
         mixed.bizDuration = task.bizDuration
         board.channels[0] = mixed
         
@@ -366,12 +361,11 @@ class MeetingPipelineManager: ObservableObject {
     
     private func updateChannelFields(channel: ChannelData) {
         if let url = channel.rawAudioOssURL { self.task.originalOssUrl = url }
+        if let path = channel.rawAudioPath { self.task.rawLocalFilePath = path }
         if let path = channel.processedAudioPath { self.task.localFilePath = path }
         if let url = channel.processedAudioOssURL { self.task.ossUrl = url }
-        if let tid = channel.tingwuTaskId { self.task.tingwuTaskId = tid }
+        if let tid = channel.transcriptionTaskId { self.task.transcriptionTaskId = tid }
         if let key = channel.taskKey { self.task.taskKey = key }
-        if let status = channel.apiStatus { self.task.apiStatus = status }
-        if let text = channel.statusText { self.task.statusText = text }
         if let dur = channel.bizDuration { self.task.bizDuration = dur }
         if let res = channel.transcript {
             self.task.transcript = res.text
@@ -421,7 +415,6 @@ class MeetingPipelineManager: ObservableObject {
             }
         }
         if let transcript = channel.transcriptData { self.task.transcriptData = transcript }
-        if let conversation = channel.conversationData { self.task.conversationData = conversation }
         if let raw = channel.rawData { self.task.rawData = raw }
     }
     

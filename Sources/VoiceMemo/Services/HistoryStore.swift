@@ -133,6 +133,7 @@ class HistoryStore: ObservableObject {
         let dst = try copyFile(from: url, suffix: "")
         
         task.localFilePath = dst.path
+        task.rawLocalFilePath = dst.path
         task.title = url.deletingPathExtension().lastPathComponent
         
         try await StorageManager.shared.currentProvider.saveTask(task)

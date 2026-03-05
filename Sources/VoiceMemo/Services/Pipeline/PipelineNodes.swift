@@ -204,7 +204,7 @@ class CreateTaskNode: PipelineNode {
         }
         
         // 2. Idempotency Check
-        if channel.tingwuTaskId != nil {
+        if channel.transcriptionTaskId != nil {
             print("CreateTaskNode: Task ID exists, skipping creation.")
             return
         }
@@ -214,7 +214,7 @@ class CreateTaskNode: PipelineNode {
         let taskId = try await services.transcriptionService.createTask(fileUrl: url)
         
         // 4. Write Output
-        board.updateChannel(channelId) { $0.tingwuTaskId = taskId }
+        board.updateChannel(channelId) { $0.transcriptionTaskId = taskId }
     }
 }
 
@@ -228,7 +228,7 @@ class PollingNode: PipelineNode {
     func run(board: inout PipelineBoard, services: ServiceProvider) async throws {
         // 1. Read Input
         let channel = try board.getChannel(channelId)
-        guard let taskId = channel.tingwuTaskId else {
+        guard let taskId = channel.transcriptionTaskId else {
             throw PipelineError.inputMissing("Task ID missing")
         }
         
@@ -236,27 +236,22 @@ class PollingNode: PipelineNode {
         let (status, data) = try await services.transcriptionService.getTaskInfo(taskId: taskId)
         
         // 3. Write Status
-        board.updateChannel(channelId) { 
-            $0.tingwuTaskStatus = status 
-            $0.apiStatus = status
-            
+        board.updateChannel(channelId) {
+            $0.transcriptionTaskStatus = status
+
             if let data = data {
                 // Volcengine: audio_info.duration
                 if let audioInfo = data["audio_info"] as? [String: Any],
                    let duration = audioInfo["duration"] as? Int {
                     $0.bizDuration = duration
                 }
-                
-                // Tingwu: TaskKey, StatusText
+
+                // Tingwu: TaskKey
                 if let taskKey = data["TaskKey"] as? String {
                     $0.taskKey = taskKey
                 } else {
                     // Fallback for Volcengine: Use the Request ID (taskId) as Task Key
                     $0.taskKey = taskId
-                }
-                
-                if let statusText = data["StatusText"] as? String {
-                    $0.statusText = statusText
                 }
             }
         }
@@ -272,15 +267,13 @@ class PollingNode: PipelineNode {
                 // Fetch complete data for database storage
                 let overviewData = await fetchOverviewData(from: result, service: services.transcriptionService)
                 let transcriptData = await fetchTranscriptData(from: result, service: services.transcriptionService)
-                let conversationData = await fetchConversationData(from: result, service: services.transcriptionService)
                 let rawData = await fetchRawData(from: data, service: services.transcriptionService)
-                
+
                 // 4. Write Output
                 board.updateChannel(channelId) {
                     $0.transcript = TingwuResult(text: transcriptText, summary: summaryText)
                     $0.overviewData = overviewData
                     $0.transcriptData = transcriptData
-                    $0.conversationData = conversationData
                     $0.rawData = rawData
                 }
             } else if let result = data?["result"] as? [String: Any] {
@@ -288,15 +281,14 @@ class PollingNode: PipelineNode {
                  // Direct parsing from the result object
                  // result contains 'text' and 'utterances'
                  let transcriptText = TranscriptParser.buildTranscriptText(from: result)
-                 
+
                  let rawData = await fetchRawData(from: data, service: services.transcriptionService)
                  let transcriptData = await fetchRawData(from: result, service: services.transcriptionService) // Save result as transcript data
-                 
+
                  board.updateChannel(channelId) {
                      $0.transcript = TingwuResult(text: transcriptText, summary: nil)
                      $0.overviewData = nil // No summary yet
                      $0.transcriptData = transcriptData
-                     $0.conversationData = nil
                      $0.rawData = rawData
                  }
             }
@@ -378,17 +370,7 @@ class PollingNode: PipelineNode {
         }
         return nil
     }
-    
-    private func fetchConversationData(from result: [String: Any], service: TranscriptionService) async -> String? {
-        // Try to fetch conversation data if available
-        if let conversationUrl = result["Conversation"] as? String {
-            if let data = try? await service.fetchJSON(url: conversationUrl) {
-                return jsonString(from: data)
-            }
-        }
-        return nil
-    }
-    
+
     private func fetchRawData(from data: [String: Any]?, service: TranscriptionService) async -> String? {
         // Store the complete raw response data
         guard let data = data else { return nil }
