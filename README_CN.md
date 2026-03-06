@@ -20,6 +20,20 @@ English version: [README.md](README.md)
 - **存储（SQLite/MySQL）**：历史记录可保存到本地或 MySQL，并支持本地同步到 MySQL。
 - **邮件通知**：支持通过配置网关将会议纪要直接发送到指定邮箱。
 
+## 界面预览
+
+<div align="center">
+  <img src="assets/screenshot-01-home.png" width="800" alt="主界面" />
+  <br/><br/>
+  <img src="assets/screenshot-02-recording.png" width="800" alt="录音界面" />
+  <br/><br/>
+  <img src="assets/screenshot-03-pipeline.png" width="800" alt="流水线界面" />
+  <br/><br/>
+  <img src="assets/screenshot-04-result.png" width="800" alt="结果界面" />
+  <br/><br/>
+  <img src="assets/screenshot-05-settings.png" width="800" alt="设置界面" />
+</div>
+
 ## 更新日志
 
 请参阅 [CHANGELOG.md](CHANGELOG.md) 查看完整的发布历史。
