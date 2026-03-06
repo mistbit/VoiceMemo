@@ -1,7 +1,7 @@
 # VoiceMemo
 
 <p align="center">
-  <img src="logo.png" width="200" />
+  <img src="assets/logo.png" width="200" />
 </p>
 
 一款专业、高保真的 macOS 音频录制工具，用于捕获任何应用程序的实时语音通话。基于 macOS 原生的 **ScreenCaptureKit** 和 **AVFoundation** 框架构建。
