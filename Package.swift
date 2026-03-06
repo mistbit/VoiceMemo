@@ -10,7 +10,7 @@ let package = Package(
         .executable(name: "VoiceMemo", targets: ["VoiceMemo"])
     ],
     dependencies: [
-        .package(url: "https://github.com/aliyun/alibabacloud-oss-swift-sdk-v2.git", from: "0.1.0-beta"),
+        .package(url: "https://github.com/aliyun/alibabacloud-oss-swift-sdk-v2.git", from: "0.2.0"),
         .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.14.1"),
         .package(url: "https://github.com/vapor/mysql-kit.git", from: "4.0.0")
     ],

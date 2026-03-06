@@ -9,7 +9,7 @@ INFO_PLIST_PATH = "Sources/VoiceMemo/Info.plist"
 RESOURCES_DIR = "Sources/VoiceMemo/Resources"
 
 DEPENDENCIES = [
-    ("https://github.com/aliyun/alibabacloud-oss-swift-sdk-v2.git", "0.1.0-beta", "AlibabaCloudOSS"),
+    ("https://github.com/aliyun/alibabacloud-oss-swift-sdk-v2.git", "0.2.0", "AlibabaCloudOSS"),
     ("https://github.com/stephencelis/SQLite.swift.git", "0.14.1", "SQLite"),
     ("https://github.com/vapor/mysql-kit.git", "4.0.0", "MySQLKit")
 ]
@@ -36,12 +36,15 @@ FRAMEWORKS_BUILD_PHASE_ID = gen_id("phase:frameworks")
 
 pkg_refs = []
 pkg_deps = []
+pkg_build_files = []
 
 for url, version, product in DEPENDENCIES:
     ref_id = gen_id(f"pkgref:{url}")
     dep_id = gen_id(f"pkgdep:{product}")
+    build_file_id = gen_id(f"pkgbuild:{product}")
     pkg_refs.append((ref_id, url, version))
     pkg_deps.append((dep_id, ref_id, product))
+    pkg_build_files.append((build_file_id, dep_id, product))
 
 source_files = []
 resource_files = []
@@ -76,7 +79,10 @@ def resource_file_type(path):
         return "image.jpeg"
     return "file"
 
-frameworks_files = ""
+frameworks_files = "\n".join(
+    f'\t\t\t\t{build_file_id} /* {product} in Frameworks */,'
+    for build_file_id, dep_id, product in pkg_build_files
+)
 resources_files = "\n".join(
     f'\t\t\t\t{b_id} /* {name} in Resources */,'
     for f_id, b_id, name, path in resource_files
@@ -103,6 +109,9 @@ for f_id, b_id, name, path in source_files:
 
 for f_id, b_id, name, path in resource_files:
     content += f'\t\t{b_id} /* {name} in Resources */ = {{isa = PBXBuildFile; fileRef = {f_id} /* {name} */; }};\n'
+
+for build_file_id, dep_id, product in pkg_build_files:
+    content += f'\t\t{build_file_id} /* {product} in Frameworks */ = {{isa = PBXBuildFile; productRef = {dep_id} /* {product} */; }};\n'
 
 content += """/* End PBXBuildFile section */
 
