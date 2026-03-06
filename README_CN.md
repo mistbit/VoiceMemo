@@ -1,7 +1,7 @@
 # VoiceMemo
 
 <p align="center">
-  <img src="logo.png" width="200" />
+  <img src="assets/logo.png" width="200" />
 </p>
 
 一款专业、高保真的 macOS 音频录制工具，用于捕获任何应用程序的实时语音通话。基于 macOS 原生的 **ScreenCaptureKit** 和 **AVFoundation** 框架构建。
@@ -19,6 +19,20 @@ English version: [README.md](README.md)
 - **会议纪要（多供应商 ASR）**：支持 **阿里云听悟** 和 **火山引擎** (字节跳动) 进行音频转写和结构化纪要生成（摘要 / 要点 / 待办），并支持导出 Markdown。
 - **存储（SQLite/MySQL）**：历史记录可保存到本地或 MySQL，并支持本地同步到 MySQL。
 - **邮件通知**：支持通过配置网关将会议纪要直接发送到指定邮箱。
+
+## 界面预览
+
+<div align="center">
+  <img src="assets/screenshot-01-home.png" width="800" alt="主界面" />
+  <br/><br/>
+  <img src="assets/screenshot-02-recording.png" width="800" alt="录音界面" />
+  <br/><br/>
+  <img src="assets/screenshot-03-pipeline.png" width="800" alt="流水线界面" />
+  <br/><br/>
+  <img src="assets/screenshot-04-result.png" width="800" alt="结果界面" />
+  <br/><br/>
+  <img src="assets/screenshot-05-settings.png" width="800" alt="设置界面" />
+</div>
 
 ## 更新日志
 

@@ -1,7 +1,7 @@
 # VoiceMemo
 
 <p align="center">
-  <img src="logo.png" width="200" />
+  <img src="assets/logo.png" width="200" />
 </p>
 
 A professional, high-fidelity audio recording utility for macOS, designed to capture real-time voice conversations from any application using the native **ScreenCaptureKit** and **AVFoundation** frameworks.
@@ -19,6 +19,20 @@ Read this in Chinese: [README_CN.md](README_CN.md)
 - **Meeting Minutes (Multi-Provider ASR)**: Support for **Alibaba Cloud Tingwu** and **Volcengine** (ByteDance) to transcribe audio and generate structured minutes (summary, key points, action items), with Markdown export.
 - **Storage Backends (SQLite/MySQL)**: Store history locally or in MySQL, with optional local-to-MySQL sync.
 - **Email Notifications**: Send meeting summaries directly to your email via a configured gateway.
+
+## Screenshots
+
+<div align="center">
+  <img src="assets/screenshot-01-home.png" width="800" alt="Home View" />
+  <br/><br/>
+  <img src="assets/screenshot-02-recording.png" width="800" alt="Recording View" />
+  <br/><br/>
+  <img src="assets/screenshot-03-pipeline.png" width="800" alt="Pipeline View" />
+  <br/><br/>
+  <img src="assets/screenshot-04-result.png" width="800" alt="Result View" />
+  <br/><br/>
+  <img src="assets/screenshot-05-settings.png" width="800" alt="Settings View" />
+</div>
 
 ## Changelog
 
