@@ -88,7 +88,7 @@ flowchart LR
 
 - `Sources/`: Core Swift implementation.
 - `Package.swift`: Swift Package Manager configuration.
-- `package_app.sh`: Automated build and ad-hoc signing script.
+- `package_app.sh`: Build, sign, notarize (optional), and archive the macOS app bundle.
 - `Info.plist`: Application configuration and permission strings.
 
 ## Getting Started
@@ -100,8 +100,14 @@ Due to macOS security requirements (ScreenCaptureKit needs specific entitlements
 ```bash
 chmod +x package_app.sh
 ./package_app.sh
-open VoiceMemo.app
+open dist/VoiceMemo.app
 ```
+
+Artifacts are written to `dist/` by default:
+
+- `dist/VoiceMemo.app`
+- `dist/VoiceMemo-<version>-macos.zip`
+- `dist/VoiceMemo-<version>-macos.zip.sha256`
 
 ### 2. Permissions
 
@@ -170,6 +176,26 @@ xed VoiceMemo.xcodeproj
 ```
 
 Ensure you configure **Signing & Capabilities** with your Development Team to run the app with full permissions.
+
+## Release
+
+Tag-driven releases are handled by [`.github/workflows/release.yml`](.github/workflows/release.yml). Pushing a tag like `v1.2.3` will:
+
+- run `swift test`
+- build a versioned macOS app archive
+- create a GitHub Release and upload the zip plus SHA-256 checksum
+
+If the following GitHub Actions secrets are configured, the workflow signs with Developer ID and notarizes the archive. Otherwise it falls back to ad-hoc signing for internal/testing distribution:
+
+- `MACOS_CERTIFICATE_P12`
+- `MACOS_CERTIFICATE_PASSWORD`
+- `MACOS_SIGNING_IDENTITY`
+- `MACOS_KEYCHAIN_PASSWORD` (optional, defaults to the certificate password)
+- `APPLE_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+- `APPLE_TEAM_ID`
+
+For signing and notarization details, see [Permissions and Signing](doc/05-permissions-and-signing.md).
 
 ## Roadmap
 

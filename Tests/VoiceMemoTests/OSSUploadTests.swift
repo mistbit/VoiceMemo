@@ -20,6 +20,7 @@ final class OSSUploadTests: XCTestCase {
         }
         
         let settings = SettingsStore()
+        settings.useKeychain = false
         settings.ossRegion = ossRegion
         settings.ossEndpoint = ossEndpoint
         settings.ossBucket = ossBucket

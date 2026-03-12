@@ -60,10 +60,45 @@ For stable behavior during development:
 
 Packaging script note:
 
-- `package_app.sh` uses ad-hoc signing (`codesign --sign -`).
+- `package_app.sh` always builds a versioned `.app` plus a `.zip` archive in `dist/`.
+- The script uses ad-hoc signing by default (`codesign --sign -`) and can switch to Developer ID signing when `SIGN_IDENTITY` is provided.
+- If `VoiceMemo.entitlements` exists, the script signs with that entitlements file to match the Xcode target more closely.
 - Ad-hoc signatures are not stable identities for repeated permission grants; repeated prompts are expected when running differently signed builds.
+
+## GitHub Tag Releases
+
+Workflow file: `.github/workflows/release.yml`
+
+When you push a tag such as `v1.2.3`, the release workflow:
+
+- runs `swift test`
+- builds `dist/VoiceMemo.app`
+- injects `CFBundleShortVersionString=1.2.3`
+- injects `CFBundleVersion=<GitHub run number>`
+- creates `dist/VoiceMemo-1.2.3-macos.zip`
+- uploads the zip and `.sha256` file to GitHub Releases
+
+### Release Secrets
+
+For ad-hoc archive publishing, no extra secrets are required.
+
+For Developer ID signing:
+
+- `MACOS_CERTIFICATE_P12`
+- `MACOS_CERTIFICATE_PASSWORD`
+- `MACOS_SIGNING_IDENTITY`
+- `MACOS_KEYCHAIN_PASSWORD` (optional)
+
+For notarization:
+
+- `APPLE_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+- `APPLE_TEAM_ID`
+
+If the signing or notarization secrets are missing, the workflow still publishes an ad-hoc signed archive. That is useful for internal distribution, but external users may still hit Gatekeeper/quarantine warnings.
 
 ## Practical Recommendation
 
 - Debug via Xcode with automatic signing and a fixed team.
-- Use the packaging script only for quick local distribution/testing; expect permission prompts unless you switch to a stable signing identity.
+- Use GitHub tag releases with Developer ID signing + notarization for public binary distribution.
+- Use ad-hoc packaging only for quick local distribution/testing; expect permission prompts unless you switch to a stable signing identity.
