@@ -60,10 +60,45 @@ macOS 隐私权限授权与“应用身份 + 签名”绑定。
 
 打包脚本说明：
 
-- `package_app.sh` 使用 ad-hoc 签名（`codesign --sign -`）
+- `package_app.sh` 会在 `dist/` 下输出带版本号的 `.app` 和 `.zip` 包
+- 脚本默认使用 ad-hoc 签名（`codesign --sign -`），如果提供 `SIGN_IDENTITY` 则会切换为 Developer ID 签名
+- 如果仓库中存在 `VoiceMemo.entitlements`，脚本会在签名时显式带上它，尽量与 Xcode target 的行为保持一致
 - ad-hoc 签名不具备稳定身份，换一种方式运行/签名后重复弹窗是预期现象
+
+## GitHub Tag 发布
+
+工作流文件：`.github/workflows/release.yml`
+
+当你推送 `v1.2.3` 这样的 tag 时，发布 workflow 会自动：
+
+- 执行 `swift test`
+- 构建 `dist/VoiceMemo.app`
+- 注入 `CFBundleShortVersionString=1.2.3`
+- 注入 `CFBundleVersion=<GitHub run number>`
+- 生成 `dist/VoiceMemo-1.2.3-macos.zip`
+- 将 zip 和 `.sha256` 文件上传到 GitHub Release
+
+### 发布所需 Secrets
+
+如果只是发布 ad-hoc 归档，不需要额外 secrets。
+
+如果要做 Developer ID 签名，需要：
+
+- `MACOS_CERTIFICATE_P12`
+- `MACOS_CERTIFICATE_PASSWORD`
+- `MACOS_SIGNING_IDENTITY`
+- `MACOS_KEYCHAIN_PASSWORD`（可选）
+
+如果要做 notarization，还需要：
+
+- `APPLE_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+- `APPLE_TEAM_ID`
+
+如果签名或公证所需 secrets 缺失，workflow 仍然会发布 ad-hoc 签名的归档。这适合内部测试，但对外分发时用户仍可能遇到 Gatekeeper 或 quarantine 提示。
 
 ## 实践建议
 
 - 调试：优先使用 Xcode + 自动签名 + 固定 Team。
-- 打包脚本：适合快速本地运行/分发测试；若要减少弹窗，需要改为稳定签名策略。
+- 对外二进制发布：优先使用 GitHub tag release + Developer ID 签名 + notarization。
+- ad-hoc 打包：适合快速本地运行/分发测试；若要减少弹窗，需要改为稳定签名策略。

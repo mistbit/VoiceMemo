@@ -16,6 +16,7 @@ final class TingwuCreateTaskTests: XCTestCase {
         }
         
         let settings = SettingsStore()
+        settings.useKeychain = false
         settings.tingwuAppKey = appKey
         settings.saveTingwuAccessKeyId(accessKeyId)
         settings.saveTingwuAccessKeySecret(accessKeySecret)
@@ -35,6 +36,7 @@ final class TingwuCreateTaskTests: XCTestCase {
         // specifically checking that Summarization and MeetingAssistance parameters are present.
         
         let settings = SettingsStore()
+        settings.useKeychain = false
         settings.tingwuAppKey = "TEST_APP_KEY"
         settings.saveTingwuAccessKeyId("TEST_AK_ID")
         settings.saveTingwuAccessKeySecret("TEST_AK_SECRET")

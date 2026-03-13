@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve release metadata
+        id: meta
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "$VERSION" ]; then
+            echo "Unable to derive version from tag: $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+
+          HAS_SIGNING="false"
+          HAS_NOTARIZATION="false"
+
+          if [ -n "$MACOS_CERTIFICATE_P12" ] && [ -n "$MACOS_CERTIFICATE_PASSWORD" ] && [ -n "$MACOS_SIGNING_IDENTITY" ]; then
+            HAS_SIGNING="true"
+          fi
+
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            HAS_NOTARIZATION="true"
+          fi
+
+          echo "app_version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "archive_name=VoiceMemo-$VERSION-macos.zip" >> "$GITHUB_OUTPUT"
+          echo "has_signing=$HAS_SIGNING" >> "$GITHUB_OUTPUT"
+          echo "has_notarization=$HAS_NOTARIZATION" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare signing keychain
+        if: steps.meta.outputs.has_signing == 'true'
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/signing_certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/voicememo-signing.keychain-db"
+          KEYCHAIN_PASSWORD="${MACOS_KEYCHAIN_PASSWORD:-$MACOS_CERTIFICATE_PASSWORD}"
+
+          printf '%s' "$MACOS_CERTIFICATE_P12" | base64 -D -o "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/xcrun
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          security default-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Run tests
+        run: swift test -v
+
+      - name: Package release archive
+        env:
+          APP_VERSION: ${{ steps.meta.outputs.app_version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          ARCHIVE_NAME: ${{ steps.meta.outputs.archive_name }}
+          HAS_SIGNING: ${{ steps.meta.outputs.has_signing }}
+          HAS_NOTARIZATION: ${{ steps.meta.outputs.has_notarization }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          SIGN_IDENTITY="-"
+          NOTARIZE="false"
+
+          if [ "$HAS_SIGNING" = "true" ]; then
+            SIGN_IDENTITY="$MACOS_SIGNING_IDENTITY"
+          fi
+
+          if [ "$HAS_SIGNING" = "true" ] && [ "$HAS_NOTARIZATION" = "true" ]; then
+            NOTARIZE="true"
+          fi
+
+          APP_VERSION="$APP_VERSION" \
+          BUILD_NUMBER="$BUILD_NUMBER" \
+          ARCHIVE_NAME="$ARCHIVE_NAME" \
+          SIGN_IDENTITY="$SIGN_IDENTITY" \
+          NOTARIZE="$NOTARIZE" \
+          APPLE_ID="$APPLE_ID" \
+          APPLE_APP_SPECIFIC_PASSWORD="$APPLE_APP_SPECIFIC_PASSWORD" \
+          APPLE_TEAM_ID="$APPLE_TEAM_ID" \
+          bash ./package_app.sh
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoiceMemo-${{ steps.meta.outputs.app_version }}
+          path: |
+            dist/${{ steps.meta.outputs.archive_name }}
+            dist/${{ steps.meta.outputs.archive_name }}.sha256
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/${{ steps.meta.outputs.archive_name }}
+            dist/${{ steps.meta.outputs.archive_name }}.sha256

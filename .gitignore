@@ -10,6 +10,7 @@ Packages.resolved
 .DS_Store
 *.app/
 *.dSYM/
+dist/
 .DocumentRevisions-V100
 .fseventsd
 .Spotlight-V100

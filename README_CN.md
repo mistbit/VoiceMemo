@@ -88,7 +88,7 @@ flowchart LR
 
 - `Sources/`：核心 Swift 代码实现。
 - `Package.swift`：Swift Package Manager 项目配置。
-- `package_app.sh`：自动化编译及 Ad-hoc 签名脚本。
+- `package_app.sh`：用于构建、签名、可选公证并归档 macOS 应用包。
 - `Info.plist`：应用配置及权限描述。
 
 ## 快速开始
@@ -100,8 +100,14 @@ flowchart LR
 ```bash
 chmod +x package_app.sh
 ./package_app.sh
-open VoiceMemo.app
+open dist/VoiceMemo.app
 ```
+
+默认产物会输出到 `dist/`：
+
+- `dist/VoiceMemo.app`
+- `dist/VoiceMemo-<version>-macos.zip`
+- `dist/VoiceMemo-<version>-macos.zip.sha256`
 
 ### 2. 权限说明
 
@@ -169,6 +175,26 @@ xed VoiceMemo.xcodeproj
 ```
 
 请务必在 **Signing & Capabilities** 中配置您的开发团队（Team），以便应用能以完整权限运行。
+
+## 发布
+
+基于 tag 的自动发布由 [`.github/workflows/release.yml`](.github/workflows/release.yml) 负责。推送 `v1.2.3` 这类 tag 时，会自动：
+
+- 执行 `swift test`
+- 构建带版本号的 macOS 应用归档
+- 创建 GitHub Release 并上传 zip 与 SHA-256 校验文件
+
+如果配置了以下 GitHub Actions secrets，workflow 会使用 Developer ID 签名并执行 notarization；如果没有配置，则回退到 ad-hoc 签名，适合内部或测试分发：
+
+- `MACOS_CERTIFICATE_P12`
+- `MACOS_CERTIFICATE_PASSWORD`
+- `MACOS_SIGNING_IDENTITY`
+- `MACOS_KEYCHAIN_PASSWORD`（可选，默认使用证书密码）
+- `APPLE_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+- `APPLE_TEAM_ID`
+
+签名和公证的细节请参阅 [权限与签名说明](doc/05-permissions-and-signing.zh-CN.md)。
 
 ## 开发路线图
 

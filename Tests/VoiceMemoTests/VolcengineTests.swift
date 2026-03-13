@@ -19,6 +19,7 @@ final class VolcengineTests: XCTestCase {
 
     func testCreateTaskRequestConstruction() throws {
         let settings = SettingsStore()
+        settings.useKeychain = false
         settings.volcAppId = "TEST_APP_ID"
         settings.volcResourceId = "volc.auc.common"
         settings.enableRoleSplit = false // Ensure it works even if setting is false
@@ -62,6 +63,7 @@ final class VolcengineTests: XCTestCase {
     
     func testQueryRequestConstruction() throws {
         let settings = SettingsStore()
+        settings.useKeychain = false
         settings.volcAppId = "TEST_APP_ID"
         settings.volcResourceId = "volc.auc.common"
         settings.saveVolcAccessToken("TEST_TOKEN")
